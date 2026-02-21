@@ -1378,6 +1378,8 @@ class LiveIntegrationRunner:
             details = item.details.replace("\n", " ").replace("|", "\\|")
             lines.append(f"| {idx} | {item.name} | {status_emoji} | {http_value} | {details} |")
 
+        report_parent = pathlib.Path(self.report_file).expanduser().resolve().parent
+        report_parent.mkdir(parents=True, exist_ok=True)
         with open(self.report_file, "w", encoding="utf-8") as fp:
             fp.write("\n".join(lines) + "\n")
 
@@ -1390,7 +1392,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--report-file",
-        default="INTEGRATION_TEST_REPORT.md",
+        default="reports/INTEGRATION_TEST_REPORT.md",
         help="Path to markdown report file.",
     )
     args = parser.parse_args()

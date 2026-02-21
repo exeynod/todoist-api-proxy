@@ -80,5 +80,5 @@ Run full live integration checks (all methods + raw/toon/default routes + multi-
 ```bash
 python3 tests/run_live_integration.py \
   --token '<your_token>' \
-  --report-file INTEGRATION_TEST_REPORT.md
+  --report-file reports/INTEGRATION_TEST_REPORT.md
 ```

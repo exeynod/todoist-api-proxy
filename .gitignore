@@ -38,3 +38,8 @@ htmlcov/
 
 *.log
 open_tasks_top_level.json
+
+# Test reports (store locally under reports/)
+INTEGRATION_TEST_REPORT*.md
+reports/*
+!reports/.gitkeep

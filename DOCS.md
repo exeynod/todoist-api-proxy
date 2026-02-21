@@ -432,7 +432,7 @@ python3 -m unittest discover -s tests
 Live end-to-end run against real Todoist API:
 ```bash
 cd /Users/exy/pet_projects/TodoistAPIProxy
-python3 tests/run_live_integration.py --token '<token>' --report-file INTEGRATION_TEST_REPORT.md
+python3 tests/run_live_integration.py --token '<token>' --report-file reports/INTEGRATION_TEST_REPORT.md
 ```
 
 ## 16. Example Calls

@@ -27,7 +27,7 @@ Use this skill for any user request about Todoist data (tasks, projects, section
 
 - Endpoints:
   - `GET /methods`
-  - `GET /tasks/today?cursor=<cursor>&limit=<limit>` (TOON convenience endpoint: overdue + today)
+  - `GET /tasks/today?cursor=<cursor>&limit=<limit>` (TOON convenience endpoint: due today or overdue; tasks without due are excluded)
   - `POST /raw/{method}`
   - `POST /toon/{method}`
   - `POST /{method}` (default TOON mode)
@@ -48,6 +48,7 @@ Use this skill for any user request about Todoist data (tasks, projects, section
 - Use only currently supported functionality from the method list below.
 - By default, execute at most one proxy request per user task.
 - If the task requires 2+ requests (for example id resolution + target action), ask user for explicit approval before making additional requests.
+- If pagination requires additional requests (`next_cursor`), ask user for explicit approval before fetching the next page(s).
 - If implementation would require Python (or any non-`curl` transport), ask user for explicit approval first.
 - If request is outside supported functionality, state that it is not supported and do not improvise workaround logic.
 - Do not attempt to fix infrastructure/network/auth issues on your own:
@@ -89,8 +90,30 @@ Choose the minimal required sequence of these methods based on user intent:
 ## Useful Optional Inputs
 
 - Pagination for task list methods: `cursor`, `limit` (upstream) and `page`, `size` (local fallback in TOON mode).
+- `task.list_by_date` TOON safety: tasks without matching due date are excluded.
+- `GET /tasks/today` TOON safety: tasks without due date are excluded; only due `<= today`.
 - Task creation/update optional fields: `description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`.
 - Checklist completion toggle: `isCompleted` (`true`/`false`).
+
+## Body Construction Rules
+
+- For `GET /tasks/today`, do not send JSON body.
+  - Use query params only: `cursor`, `limit`.
+- For `POST` list/get/delete methods without inputs, send `{}`.
+- For `task.create`:
+  - Required: `name`.
+  - Recommended body for dated task: `{"name":"...","description":"...","date":"YYYY-MM-DD"}`.
+  - `description` is passed through as task description.
+  - `date`/`startDate`:
+    - If `YYYY-MM-DD`: due date.
+    - If datetime string: due datetime.
+    - If both present, `startDate` has priority over `date`.
+  - `endDate` maps to deadline date.
+  - `projectId` and `taskGroupId` set project/section.
+- For `task.update`:
+  - Required: `task_id`.
+  - Optional body fields follow `task.create` rules (`description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`, `labels`).
+- Do not send unknown fields; if unsure, check `GET /methods` first.
 
 ## Response Rules
 
@@ -104,16 +127,17 @@ Choose the minimal required sequence of these methods based on user intent:
 ## Practical Examples
 
 1. "Сколько задач на сегодня":
-   - Call `POST ${TODOIST_PROXY_BASE_URL}/toon/task.list_by_date` with `{"date":"YYYY-MM-DD"}`.
+   - Prefer `GET ${TODOIST_PROXY_BASE_URL}/tasks/today?limit=100`.
    - Read `response.d` array and return count.
 
 2. "Покажи задачи по работе":
    - Call `POST ${TODOIST_PROXY_BASE_URL}/toon/project.list`, resolve project id for "Работа".
    - Call `POST ${TODOIST_PROXY_BASE_URL}/toon/task.list_by_project` with `{"project_id":"<id>"}`.
+   - If response has `next_cursor` and user approved additional requests, continue with `{"project_id":"<id>","cursor":"<next_cursor>","limit":<N>}`.
    - Return concise list from `response.d`.
 
 3. "Создай задачу":
-   - Call `POST ${TODOIST_PROXY_BASE_URL}/toon/task.create` with `{"name":"..."}`.
+   - Call `POST ${TODOIST_PROXY_BASE_URL}/toon/task.create` with `{"name":"...","description":"...","date":"YYYY-MM-DD"}`.
    - Read created task from `response.d`.
 
 ## Curl Template
