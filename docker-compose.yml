@@ -36,4 +36,4 @@ services:
 networks:
   todoist_rest_proxy:
     name: todoist_rest_proxy
-    driver: bridge
+    external: true
