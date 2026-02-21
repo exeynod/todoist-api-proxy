@@ -1,0 +1,39 @@
+services:
+  todoist-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - todoist_rest_proxy
+    environment:
+      TODOIST_TIMEOUT_SECONDS: ${TODOIST_TIMEOUT_SECONDS:-5}
+      TODOIST_RATE_LIMIT_RPS: ${TODOIST_RATE_LIMIT_RPS:-0.2}
+      TODOIST_RATE_LIMIT_BURST: ${TODOIST_RATE_LIMIT_BURST:-2.0}
+      TODOIST_RATE_LIMIT_STATE_FILE: ${TODOIST_RATE_LIMIT_STATE_FILE:-/tmp/todoist_proxy_rate_limit.json}
+      TODOIST_CACHE_TTL_SECONDS: ${TODOIST_CACHE_TTL_SECONDS:-15}
+      TODOIST_CACHE_MAX_SIZE: ${TODOIST_CACHE_MAX_SIZE:-1024}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/methods', timeout=3).read()
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  todoist_rest_proxy:
+    name: todoist_rest_proxy
+    driver: bridge

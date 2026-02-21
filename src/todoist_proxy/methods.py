@@ -1,0 +1,306 @@
+from __future__ import annotations
+
+from todoist_proxy.schemas import InputValidationError, MethodSchema, RequestSpec
+
+
+_METHODS: tuple[MethodSchema, ...] = (
+    MethodSchema(
+        name="task.list",
+        http_method="GET",
+        path_template="/tasks",
+        description="List tasks.",
+        required=(),
+        optional=("page", "size", "cursor", "limit"),
+        path_params=(),
+        query_params=(("cursor", "cursor"), ("limit", "limit")),
+        body_params=(),
+        toon_output="task[]",
+    ),
+    MethodSchema(
+        name="task.list_by_project",
+        http_method="GET",
+        path_template="/tasks",
+        description="List tasks by project id.",
+        required=("project_id",),
+        optional=("page", "size", "cursor", "limit"),
+        path_params=(),
+        query_params=(("project_id", "project_id"), ("cursor", "cursor"), ("limit", "limit")),
+        body_params=(),
+        toon_output="task[]",
+    ),
+    MethodSchema(
+        name="task.list_by_date",
+        http_method="GET",
+        path_template="/tasks",
+        description="List tasks by due date.",
+        required=("date",),
+        optional=("page", "size", "cursor", "limit"),
+        path_params=(),
+        query_params=(("cursor", "cursor"), ("limit", "limit")),
+        body_params=(),
+        toon_output="task[]",
+    ),
+    MethodSchema(
+        name="task.get",
+        http_method="GET",
+        path_template="/tasks/{task_id}",
+        description="Get task by id.",
+        required=("task_id",),
+        optional=(),
+        path_params=("task_id",),
+        query_params=(),
+        body_params=(),
+        toon_output="task",
+    ),
+    MethodSchema(
+        name="task.create",
+        http_method="POST",
+        path_template="/tasks",
+        description="Create task.",
+        required=("name",),
+        optional=("description", "date", "startDate", "endDate", "priority", "projectId", "taskGroupId", "labels"),
+        path_params=(),
+        query_params=(),
+        body_params=(
+            ("name", "name"),
+            ("description", "description"),
+            ("date", "date"),
+            ("startDate", "startDate"),
+            ("endDate", "endDate"),
+            ("priority", "priority"),
+            ("projectId", "projectId"),
+            ("taskGroupId", "taskGroupId"),
+            ("labels", "labels"),
+        ),
+        toon_output="task",
+    ),
+    MethodSchema(
+        name="task.update",
+        http_method="POST",
+        path_template="/tasks/{task_id}",
+        description="Update task.",
+        required=("task_id",),
+        optional=("name", "description", "date", "startDate", "endDate", "priority", "projectId", "taskGroupId", "labels"),
+        path_params=("task_id",),
+        query_params=(),
+        body_params=(
+            ("name", "name"),
+            ("description", "description"),
+            ("date", "date"),
+            ("startDate", "startDate"),
+            ("endDate", "endDate"),
+            ("priority", "priority"),
+            ("projectId", "projectId"),
+            ("taskGroupId", "taskGroupId"),
+            ("labels", "labels"),
+        ),
+        toon_output="task",
+    ),
+    MethodSchema(
+        name="task.delete",
+        http_method="DELETE",
+        path_template="/tasks/{task_id}",
+        description="Delete task.",
+        required=("task_id",),
+        optional=(),
+        path_params=("task_id",),
+        query_params=(),
+        body_params=(),
+        toon_output='{"ok":1}',
+    ),
+    MethodSchema(
+        name="project.list",
+        http_method="GET",
+        path_template="/projects",
+        description="List projects.",
+        required=(),
+        optional=("page", "size"),
+        path_params=(),
+        query_params=(),
+        body_params=(),
+        toon_output="project[]",
+    ),
+    MethodSchema(
+        name="project.get",
+        http_method="GET",
+        path_template="/projects/{project_id}",
+        description="Get project by id.",
+        required=("project_id",),
+        optional=(),
+        path_params=("project_id",),
+        query_params=(),
+        body_params=(),
+        toon_output="project",
+    ),
+    MethodSchema(
+        name="project.create",
+        http_method="POST",
+        path_template="/projects",
+        description="Create project.",
+        required=("name",),
+        optional=("description",),
+        path_params=(),
+        query_params=(),
+        body_params=(("name", "name"), ("description", "description")),
+        toon_output="project",
+    ),
+    MethodSchema(
+        name="project.update",
+        http_method="POST",
+        path_template="/projects/{project_id}",
+        description="Update project.",
+        required=("project_id",),
+        optional=("name", "description"),
+        path_params=("project_id",),
+        query_params=(),
+        body_params=(("name", "name"), ("description", "description")),
+        toon_output="project",
+    ),
+    MethodSchema(
+        name="project.delete",
+        http_method="DELETE",
+        path_template="/projects/{project_id}",
+        description="Delete project.",
+        required=("project_id",),
+        optional=(),
+        path_params=("project_id",),
+        query_params=(),
+        body_params=(),
+        toon_output='{"ok":1}',
+    ),
+    MethodSchema(
+        name="section.list_by_project",
+        http_method="GET",
+        path_template="/sections",
+        description="List sections by project id.",
+        required=("project_id",),
+        optional=("page", "size"),
+        path_params=(),
+        query_params=(("project_id", "project_id"),),
+        body_params=(),
+        toon_output="section[]",
+    ),
+    MethodSchema(
+        name="section.get",
+        http_method="GET",
+        path_template="/sections/{task_group_id}",
+        description="Get section by id.",
+        required=("task_group_id",),
+        optional=(),
+        path_params=("task_group_id",),
+        query_params=(),
+        body_params=(),
+        toon_output="section",
+    ),
+    MethodSchema(
+        name="section.create",
+        http_method="POST",
+        path_template="/sections",
+        description="Create section.",
+        required=("name", "projectId"),
+        optional=("description",),
+        path_params=(),
+        query_params=(),
+        body_params=(("name", "name"), ("description", "description"), ("projectId", "projectId")),
+        toon_output="section",
+    ),
+    MethodSchema(
+        name="section.update",
+        http_method="POST",
+        path_template="/sections/{task_group_id}",
+        description="Update section.",
+        required=("task_group_id",),
+        optional=("name", "description", "projectId"),
+        path_params=("task_group_id",),
+        query_params=(),
+        body_params=(("name", "name"), ("description", "description"), ("projectId", "projectId")),
+        toon_output="section",
+    ),
+    MethodSchema(
+        name="section.delete",
+        http_method="DELETE",
+        path_template="/sections/{task_group_id}",
+        description="Delete section.",
+        required=("task_group_id",),
+        optional=(),
+        path_params=("task_group_id",),
+        query_params=(),
+        body_params=(),
+        toon_output='{"ok":1}',
+    ),
+    MethodSchema(
+        name="checklist.create",
+        http_method="POST",
+        path_template="/tasks",
+        description="Create checklist item (Todoist subtask).",
+        required=("task_id", "name"),
+        optional=("isCompleted",),
+        path_params=(),
+        query_params=(),
+        body_params=(("name", "name"), ("isCompleted", "isCompleted")),
+        toon_output="checklist_item",
+    ),
+    MethodSchema(
+        name="checklist.update",
+        http_method="POST",
+        path_template="/tasks/{checklist_item_id}",
+        description="Update checklist item (Todoist subtask).",
+        required=("task_id", "checklist_item_id"),
+        optional=("name", "isCompleted"),
+        path_params=("checklist_item_id",),
+        query_params=(),
+        body_params=(("name", "name"), ("isCompleted", "isCompleted")),
+        toon_output="checklist_item",
+    ),
+    MethodSchema(
+        name="checklist.delete",
+        http_method="DELETE",
+        path_template="/tasks/{checklist_item_id}",
+        description="Delete checklist item (Todoist subtask).",
+        required=("task_id", "checklist_item_id"),
+        optional=(),
+        path_params=("checklist_item_id",),
+        query_params=(),
+        body_params=(),
+        toon_output='{"ok":1}',
+    ),
+)
+
+_METHOD_MAP = {item.name: item for item in _METHODS}
+
+
+def list_schemas() -> tuple[MethodSchema, ...]:
+    return _METHODS
+
+
+def list_methods() -> tuple[str, ...]:
+    return tuple(item.name for item in _METHODS)
+
+
+def get_schema(method_name: str) -> MethodSchema:
+    try:
+        return _METHOD_MAP[method_name]
+    except KeyError as exc:
+        raise InputValidationError(f"unknown method '{method_name}'") from exc
+
+
+def build_request(method_name: str, payload: dict[str, object] | None) -> RequestSpec:
+    schema = get_schema(method_name)
+    return schema.to_request(payload)
+
+
+def method_catalog_rows() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for item in _METHODS:
+        rows.append(
+            {
+                "name": item.name,
+                "http_method": item.http_method,
+                "path": item.path_template,
+                "required": list(item.required),
+                "optional": list(item.optional),
+                "toon_output": item.toon_output,
+                "description": item.description,
+            }
+        )
+    return rows
