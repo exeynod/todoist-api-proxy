@@ -52,6 +52,10 @@ class ToonTests(unittest.TestCase):
         out = to_toon_response("task.delete", {"any": "payload"})
         self.assertEqual({"d": {"ok": 1}}, out)
 
+    def test_close_always_ok(self) -> None:
+        out = to_toon_response("task.close", {"any": "payload"})
+        self.assertEqual({"d": {"ok": 1}}, out)
+
     def test_task_list_extracts_nested_items(self) -> None:
         raw = {
             "data": {
@@ -119,6 +123,17 @@ class ToonTests(unittest.TestCase):
 
         out = to_toon_response("task.list", raw)
         self.assertEqual({"d": [{"n": "Task 1"}], "next_cursor": "cursor-1"}, out)
+
+    def test_task_projection_includes_section_reference(self) -> None:
+        raw = {
+            "id": "t1",
+            "content": "Task 1",
+            "section_id": "s1",
+            "is_completed": False,
+        }
+
+        out = to_toon_response("task.get", raw)
+        self.assertEqual({"d": {"n": "Task 1", "tg": "s1"}}, out)
 
     def test_task_list_by_date_filters_items_without_matching_due_date(self) -> None:
         raw = {

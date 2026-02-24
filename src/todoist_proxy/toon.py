@@ -45,7 +45,7 @@ def to_toon_response(
     raw_payload: Any,
     request_input: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if method_name.endswith(".delete"):
+    if method_name.endswith(".delete") or method_name == "task.close":
         return {"d": {"ok": 1}}
 
     prepared = convert_datetimes_to_msk(raw_payload)
@@ -321,11 +321,28 @@ def _task_to_toon(task: dict[str, Any]) -> dict[str, Any]:
         "n": _clean_text(_first_present(task, "name", "title", "content")),
         "d": _task_description(task),
         "s": _task_start(task),
+        "tg": _task_section_ref(task),
         "p": _priority_to_int(task.get("priority")),
         "x": _bool_to_int(done_value),
         "c": [_checklist_item_to_toon(item) for item in checklist_items],
     }
     return _compact_dict(toon)
+
+
+def _task_section_ref(task: dict[str, Any]) -> str | None:
+    direct = _first_present(task, "taskGroupId", "task_group_id", "sectionId", "section_id")
+    if direct is not None:
+        text = str(direct).strip()
+        return text or None
+
+    section = task.get("section")
+    if isinstance(section, dict):
+        nested = _first_present(section, "id", "sectionId", "section_id")
+        if nested is not None:
+            text = str(nested).strip()
+            return text or None
+
+    return None
 
 
 def _project_to_toon(project: dict[str, Any]) -> dict[str, Any]:

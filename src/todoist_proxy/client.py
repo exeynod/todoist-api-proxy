@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json as jsonlib
+from datetime import datetime
 import os
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -22,10 +24,13 @@ DEFAULT_TIMEOUT_SECONDS = 5
 DEFAULT_RATE_LIMIT_RPS = 0.2
 DEFAULT_RATE_LIMIT_BURST = 2.0
 DEFAULT_RATE_LIMIT_STATE_FILE = "/tmp/todoist_proxy_rate_limit.json"
+DEFAULT_API_LOG_DIR = "/tmp"
+
+_API_LOG_LOCK = threading.Lock()
 
 
 class MissingTokenError(RuntimeError):
-    """Raised when TODOIST_ACCESS_TOKEN is missing."""
+    """Raised when request token is missing."""
 
 
 @dataclass
@@ -46,9 +51,9 @@ class TodoistClient:
         session: Any | None = None,
         rate_limiter: Any | None = None,
     ) -> None:
-        resolved_token = token or os.getenv("TODOIST_ACCESS_TOKEN") or os.getenv("TODOIST_API_TOKEN")
+        resolved_token = token
         if not resolved_token:
-            raise MissingTokenError("TODOIST_ACCESS_TOKEN is not set")
+            raise MissingTokenError("request token is not set")
 
         self.token = resolved_token
         self.token_scope = token_fingerprint(resolved_token)
@@ -71,24 +76,48 @@ class TodoistClient:
         if spec.body:
             headers["Content-Type"] = "application/json"
 
-        response = self.session.request(
-            spec.method,
-            f"{self.base_url}{spec.path}",
-            params=spec.query or None,
-            json=spec.body or None,
-            headers=headers,
-            timeout=self.timeout_seconds,
-        )
-
-        payload = _decode_payload(response)
-        if response.status_code >= 400:
-            raise ApiError(
-                status=response.status_code,
-                message=_extract_error_message(response, payload),
-                payload=payload,
+        url = f"{self.base_url}{spec.path}"
+        started_at = time.monotonic()
+        status_code: int | None = None
+        error_message: str | None = None
+        try:
+            response = self.session.request(
+                spec.method,
+                url,
+                params=spec.query or None,
+                json=spec.body or None,
+                headers=headers,
+                timeout=self.timeout_seconds,
             )
-
-        return payload
+            status_code = int(getattr(response, "status_code", 0))
+            payload = _decode_payload(response)
+            if status_code >= 400:
+                error_message = _extract_error_message(response, payload)
+                raise ApiError(
+                    status=status_code,
+                    message=error_message,
+                    payload=payload,
+                )
+            return payload
+        except ApiError as exc:
+            if status_code is None:
+                status_code = exc.status
+            if error_message is None:
+                error_message = exc.message
+            raise
+        except Exception as exc:
+            error_message = str(exc) or exc.__class__.__name__
+            raise
+        finally:
+            elapsed_ms = (time.monotonic() - started_at) * 1000.0
+            _append_api_call_log(
+                method=spec.method,
+                url=url,
+                status=status_code,
+                token_scope=self.token_scope,
+                elapsed_ms=elapsed_ms,
+                error=error_message,
+            )
 
 
 def _decode_payload(response: Any) -> Any:
@@ -121,6 +150,44 @@ def _default_session() -> Any:
     if requests is not None:
         return requests.Session()
     return _StdlibSession()
+
+
+def _append_api_call_log(
+    *,
+    method: str,
+    url: str,
+    status: int | None,
+    token_scope: str,
+    elapsed_ms: float,
+    error: str | None,
+) -> None:
+    now = datetime.now()
+    payload: dict[str, Any] = {
+        "ts": now.isoformat(timespec="seconds"),
+        "method": method.upper(),
+        "url": url,
+        "status": status,
+        "token_scope": token_scope,
+        "elapsed_ms": round(elapsed_ms, 3),
+    }
+    if error:
+        payload["error"] = error
+
+    log_path = _api_log_file_path(now)
+    line = jsonlib.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+    try:
+        with _API_LOG_LOCK:
+            with open(log_path, "a", encoding="utf-8") as fp:
+                fp.write(line)
+                fp.write("\n")
+    except OSError:
+        # Logging is best-effort and must not break request handling.
+        return
+
+
+def _api_log_file_path(now: datetime) -> str:
+    return os.path.join(DEFAULT_API_LOG_DIR, f"logs_{now.strftime('%Y%m%d')}.log")
 
 
 class _FileTokenBucketRateLimiter:

@@ -173,9 +173,22 @@ class AppTests(unittest.TestCase):
         self.assertEqual("Task", payload["d"]["n"])
         self.assertEqual("2026-02-18T03:00:00+03:00", payload["d"]["s"])
 
+    def test_toon_task_close_returns_ok(self) -> None:
+        app = create_app(client_factory=lambda token=None: DummyClient({}))
+
+        status, payload = call_wsgi(
+            app,
+            "POST",
+            "/toon/task.close",
+            body=b'{"task_id":"t1"}',
+        )
+
+        self.assertEqual(200, status)
+        self.assertEqual({"d": {"ok": 1}}, payload)
+
     def test_missing_token_returns_status_2(self) -> None:
         def factory(token=None):
-            raise MissingTokenError("TODOIST_ACCESS_TOKEN is not set")
+            raise MissingTokenError("request token is not set")
 
         app = create_app(client_factory=factory)
 

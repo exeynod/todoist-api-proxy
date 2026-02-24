@@ -78,6 +78,13 @@ class MethodsTests(unittest.TestCase):
                 "query": {},
                 "body": {},
             },
+            "task.close": {
+                "input": {"task_id": "t1"},
+                "method": "POST",
+                "path": "/tasks/t1/close",
+                "query": {},
+                "body": {},
+            },
             "project.list": {
                 "input": {"page": 1, "size": 10},
                 "method": "GET",
@@ -220,6 +227,19 @@ class MethodsTests(unittest.TestCase):
             {"task_id": "t1", "date": "2026-02-19"},
         )
         self.assertEqual({"date": "2026-02-19"}, update_request.body)
+
+    def test_task_create_and_update_accept_section_aliases(self) -> None:
+        create_request = build_request(
+            "task.create",
+            {"name": "Task", "section_id": "s1"},
+        )
+        self.assertEqual({"name": "Task", "section_id": "s1"}, create_request.body)
+
+        update_request = build_request(
+            "task.update",
+            {"task_id": "t1", "sectionId": "s2"},
+        )
+        self.assertEqual({"sectionId": "s2"}, update_request.body)
 
 
 if __name__ == "__main__":

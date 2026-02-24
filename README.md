@@ -9,7 +9,6 @@ Current upstream API base:
 
 ## Requirements
 - Python `>=3.9`
-- Environment variable: `TODOIST_ACCESS_TOKEN`
 
 Optional environment variables:
 - `TODOIST_TIMEOUT_SECONDS` (default: `5`)
@@ -18,6 +17,9 @@ Optional environment variables:
 - `TODOIST_RATE_LIMIT_STATE_FILE` (default: `/tmp/todoist_proxy_rate_limit.json`)
 - `TODOIST_CACHE_TTL_SECONDS` (default: `15`)
 - `TODOIST_CACHE_MAX_SIZE` (default: `1024`)
+
+API call logs:
+- Outbound Todoist API calls are appended to `/tmp/logs_YYYYMMDD.log` (one file per day, JSONL).
 
 ## Run
 ```bash
@@ -47,9 +49,14 @@ docker compose exec todoist-proxy python -c \
 
 `POST` body must be a JSON object. Empty body means `{}`.
 
-For multi-user usage on one host, token can be passed per request:
+Every Todoist request must include token in headers:
 - `Authorization: Bearer <token>` (preferred)
 - `X-TODOIST-ACCESS-TOKEN: <token>`
+
+Task-specific notes:
+- `task.close` is supported (`POST /raw/task.close`, `POST /toon/task.close`, `POST /task.close`).
+- `task.create`/`task.update` accept section aliases: `taskGroupId`, `sectionId`, `section_id`.
+- TOON task payload may include `tg` (section id).
 
 ## Examples
 Examples below assume local non-Docker run from the `Run` section.
@@ -58,10 +65,12 @@ Examples below assume local non-Docker run from the `Run` section.
 curl -sS http://127.0.0.1:8080/methods
 
 curl -sS -X POST http://127.0.0.1:8080/raw/task.get \
+  -H "Authorization: Bearer <token>" \
   -H 'content-type: application/json' \
   -d '{"task_id":"12345"}'
 
 curl -sS -X POST http://127.0.0.1:8080/toon/task.list \
+  -H "Authorization: Bearer <token>" \
   -H 'content-type: application/json' \
   -d '{"page":1,"size":20}'
 
@@ -72,6 +81,11 @@ curl -sS -X POST http://127.0.0.1:8080/toon/task.create \
   -H "Authorization: Bearer <token>" \
   -H "content-type: application/json" \
   -d '{"name":"Оплатить счет","description":"До конца дня","date":"2026-02-21"}'
+
+curl -sS -X POST http://127.0.0.1:8080/toon/task.close \
+  -H "Authorization: Bearer <token>" \
+  -H "content-type: application/json" \
+  -d '{"task_id":"12345"}'
 ```
 
 ## Live Integration Suite
