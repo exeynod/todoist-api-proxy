@@ -36,8 +36,4 @@ services:
 networks:
   todoist_rest_proxy:
     name: todoist_rest_proxy
-<<<<<<< HEAD
     external: true
-=======
-    external: true
->>>>>>> d1f5bbdab6cc020d3bf55aa8aeb9d2f9eff31930
