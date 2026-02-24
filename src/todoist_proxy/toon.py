@@ -37,7 +37,7 @@ _LIST_CONTAINER_KEYS = (
 )
 _PAGINATION_CURSOR_KEYS = ("next_cursor", "nextCursor")
 _NOTE_POINTER_RE = re.compile(r"^N-[A-Za-z0-9-]+$")
-_META_FIELDS = {"p", "x"}
+_META_FIELDS = {"x"}
 
 
 def to_toon_response(
@@ -321,6 +321,7 @@ def _task_to_toon(task: dict[str, Any]) -> dict[str, Any]:
         "n": _clean_text(_first_present(task, "name", "title", "content")),
         "d": _task_description(task),
         "s": _task_start(task),
+        "l": _task_labels(task),
         "tg": _task_section_ref(task),
         "p": _priority_to_int(task.get("priority")),
         "x": _bool_to_int(done_value),
@@ -343,6 +344,32 @@ def _task_section_ref(task: dict[str, Any]) -> str | None:
             return text or None
 
     return None
+
+
+def _task_labels(task: dict[str, Any]) -> list[str]:
+    for key in ("labels", "label_names", "labelNames"):
+        labels = _normalize_string_list(task.get(key))
+        if labels:
+            return labels
+    return []
+
+
+def _normalize_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    normalized: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            text = item.strip()
+            if text:
+                normalized.append(text)
+            continue
+        if isinstance(item, dict):
+            text = _clean_text(_first_present(item, "name", "label", "title"))
+            if isinstance(text, str) and text:
+                normalized.append(text)
+    return normalized
 
 
 def _project_to_toon(project: dict[str, Any]) -> dict[str, Any]:
@@ -392,22 +419,33 @@ def _task_start(task: dict[str, Any]) -> Any:
 
 
 def _priority_to_int(value: Any) -> int | None:
-    mapping = {"low": 0, "medium": 1, "high": 2}
+    named = {
+        "natural": 1,
+        "normal": 1,
+        "low": 1,
+        "medium": 2,
+        "high": 3,
+        "urgent": 4,
+    }
 
-    if isinstance(value, int) and value in (0, 1, 2):
-        return value
-
-    if isinstance(value, int) and value in (1, 2, 3, 4):
-        if value <= 2:
-            return 0
-        if value == 3:
+    if isinstance(value, int):
+        if value in (1, 2, 3, 4):
+            return value
+        if value == 0:
             return 1
-        return 2
+        return None
 
     if isinstance(value, str):
         text = value.strip().lower()
-        if text in mapping:
-            return mapping[text]
+        if not text:
+            return None
+        if text in named:
+            return named[text]
+        if text.startswith("p") and len(text) == 2 and text[1].isdigit():
+            level = int(text[1])
+            if 1 <= level <= 4:
+                # Todoist clients use P1..P4, API stores 4..1.
+                return 5 - level
         if text.isdigit():
             number = int(text)
             return _priority_to_int(number)

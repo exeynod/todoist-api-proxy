@@ -64,7 +64,10 @@ def _task_payload_to_todoist(payload: JsonDict) -> JsonDict:
     if labels:
         body["labels"] = labels
 
-    priority = _normalize_priority(payload.get("priority"))
+    priority_value = payload.get("priority")
+    if priority_value is None:
+        priority_value = payload.get("p")
+    priority = _normalize_priority(priority_value)
     if priority is not None:
         body["priority"] = priority
 
@@ -114,9 +117,12 @@ def _normalize_labels(value: Any) -> list[str]:
 
 def _normalize_priority(value: Any) -> int | None:
     named = {
+        "natural": 1,
+        "normal": 1,
         "low": 1,
         "medium": 2,
-        "high": 4,
+        "high": 3,
+        "urgent": 4,
     }
 
     if isinstance(value, int):
@@ -124,10 +130,18 @@ def _normalize_priority(value: Any) -> int | None:
             return value
         if value == 0:
             return 1
+        return None
     if isinstance(value, str):
         text = value.strip().lower()
+        if not text:
+            return None
         if text in named:
             return named[text]
+        if text.startswith("p") and len(text) == 2 and text[1].isdigit():
+            level = int(text[1])
+            if 1 <= level <= 4:
+                # Todoist clients use P1..P4, API stores 4..1.
+                return 5 - level
         if text.isdigit():
             return _normalize_priority(int(text))
 

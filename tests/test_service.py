@@ -48,7 +48,7 @@ class ServiceTests(unittest.TestCase):
                 "description": "Desc",
                 "due_date": "2026-02-18",
                 "deadline_date": "2026-02-19",
-                "priority": 4,
+                "priority": 3,
                 "project_id": "p1",
                 "section_id": "s1",
                 "labels": ["Работа"],
@@ -129,6 +129,40 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual("POST", call.method)
         self.assertEqual("/tasks/t1", call.path)
         self.assertEqual({"content": "Task Updated", "section_id": "s2"}, call.body)
+
+    def test_task_update_accepts_compact_priority_alias(self) -> None:
+        client = RecordingClient(responses=[{"id": "t1"}])
+
+        execute_method(
+            client,
+            "task.update",
+            {
+                "task_id": "t1",
+                "p": 4,
+            },
+        )
+
+        call = client.calls[0]
+        self.assertEqual("POST", call.method)
+        self.assertEqual("/tasks/t1", call.path)
+        self.assertEqual({"priority": 4}, call.body)
+
+    def test_task_create_accepts_p1_priority_notation(self) -> None:
+        client = RecordingClient(responses=[{"id": "t1"}])
+
+        execute_method(
+            client,
+            "task.create",
+            {
+                "name": "Task",
+                "priority": "P1",
+            },
+        )
+
+        call = client.calls[0]
+        self.assertEqual("POST", call.method)
+        self.assertEqual("/tasks", call.path)
+        self.assertEqual({"content": "Task", "priority": 4}, call.body)
 
     def test_task_close_calls_close_endpoint(self) -> None:
         client = RecordingClient(responses=[{}])

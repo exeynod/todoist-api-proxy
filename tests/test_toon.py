@@ -15,6 +15,7 @@ class ToonTests(unittest.TestCase):
             "description": "Desc",
             "due": {"datetime": "2026-02-18T00:00:00Z"},
             "priority": 4,
+            "labels": ["Work", "Urgent"],
             "is_completed": False,
             "updatedAt": "2026-02-18T08:00:00Z",
             "subtasks": [{"id": "c1", "content": "item1", "is_completed": True}],
@@ -29,6 +30,8 @@ class ToonTests(unittest.TestCase):
                     "n": "Task",
                     "d": "Desc",
                     "s": "2026-02-18T03:00:00+03:00",
+                    "l": ["Work", "Urgent"],
+                    "p": 4,
                     "c": [{"i": "c1", "n": "item1"}],
                 }
             },
@@ -67,6 +70,7 @@ class ToonTests(unittest.TestCase):
                         "description": "Desc",
                         "due": {"datetime": "2026-02-18T00:00:00Z"},
                         "priority": 4,
+                        "labels": ["Work"],
                         "is_completed": False,
                     }
                 ],
@@ -84,6 +88,8 @@ class ToonTests(unittest.TestCase):
                         "n": "Task",
                         "d": "Desc",
                         "s": "2026-02-18T03:00:00+03:00",
+                        "l": ["Work"],
+                        "p": 4,
                     }
                 ]
             },

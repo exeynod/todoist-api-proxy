@@ -241,6 +241,19 @@ class MethodsTests(unittest.TestCase):
         )
         self.assertEqual({"sectionId": "s2"}, update_request.body)
 
+    def test_task_create_and_update_accept_compact_priority_alias(self) -> None:
+        create_request = build_request(
+            "task.create",
+            {"name": "Task", "p": 4},
+        )
+        self.assertEqual({"name": "Task", "p": 4}, create_request.body)
+
+        update_request = build_request(
+            "task.update",
+            {"task_id": "t1", "p": 2},
+        )
+        self.assertEqual({"p": 2}, update_request.body)
+
 
 if __name__ == "__main__":
     unittest.main()

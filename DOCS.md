@@ -216,14 +216,14 @@ The service supports exactly these method names:
 - `task.create`
   - Upstream: `POST /tasks`
   - Required: `name`
-  - Optional: `description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`, `sectionId`, `section_id`
+  - Optional: `description`, `date`, `startDate`, `endDate`, `priority`, `p`, `projectId`, `taskGroupId`, `sectionId`, `section_id`
   - Body adaptation:
     - `name` -> `content`
     - `projectId` -> `project_id`
     - section alias resolution (`taskGroupId`, `sectionId`, `section_id`) -> `section_id`
     - `date`/`startDate` -> `due_date` (if date-only) or `due_datetime`
     - `endDate` -> `deadline_date` (first 10 chars for datetime strings)
-    - `priority` normalized to Todoist scale (`1..4`).
+    - `priority`/`p` normalized to Todoist scale (`1..4`), including `P1..P4` notation.
 - `task.update`
   - Upstream: `POST /tasks/{task_id}`
   - Same field mapping as `task.create`.
@@ -360,6 +360,8 @@ Implemented in:
   - `n` (name/content/title),
   - `d` (description/note),
   - `s` (date/datetime start-like field),
+  - `l` (labels list),
+  - `p` (priority `1..4`),
   - `tg` (section/task-group id),
   - `c` (checklist/subtasks list mapped to checklist projection).
 - Project fields:
@@ -371,7 +373,7 @@ Implemented in:
 
 ### 12.5 Meta compaction
 - Meta keys are removed from final TOON payload:
-  - `p`, `x`.
+  - `x`.
 - Null/empty strings/empty arrays/empty objects are compacted away.
 
 ### 12.6 Local pagination fallback
