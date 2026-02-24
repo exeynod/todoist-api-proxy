@@ -50,7 +50,6 @@ Project root:
 ### 3.2 Local Run
 ```bash
 cd /Users/exy/pet_projects/TodoistAPIProxy
-export TODOIST_ACCESS_TOKEN='<your_token>'
 PYTHONPATH=src python3 -m todoist_proxy --host 127.0.0.1 --port 8080
 ```
 
@@ -75,15 +74,7 @@ docker compose exec todoist-proxy python -c \
 
 ## 4. Environment Variables
 
-### 4.1 Required
-- `TODOIST_ACCESS_TOKEN`
-  - Primary auth token.
-
-### 4.2 Accepted token alias
-- `TODOIST_API_TOKEN`
-  - Used if `TODOIST_ACCESS_TOKEN` is absent.
-
-### 4.3 Optional network controls
+### 4.1 Optional network controls
 - `TODOIST_TIMEOUT_SECONDS`
   - Global request timeout.
   - Default: `5`.
@@ -98,7 +89,7 @@ docker compose exec todoist-proxy python -c \
   - Shared host-local state file for multi-process coordination.
   - Default: `/tmp/todoist_proxy_rate_limit.json`.
 
-### 4.4 Optional cache controls
+### 4.2 Optional cache controls
 - `TODOIST_CACHE_TTL_SECONDS`
   - In-memory response cache TTL for read methods.
   - Default: `15`.
@@ -130,11 +121,9 @@ docker compose exec todoist-proxy python -c \
 - Invalid JSON or non-object JSON returns validation error.
 
 ### 5.3 Per-request token override
-When multiple users share the same proxy host, token can be passed per request:
+Each request to Todoist methods must include token in headers:
 - `Authorization: Bearer <token>` (preferred)
 - `X-TODOIST-ACCESS-TOKEN: <token>`
-
-If headers are not provided, service falls back to environment token.
 
 ### 5.4 Success Output
 - Always JSON.
@@ -162,7 +151,7 @@ Format is always:
 ### 6.2 Missing token
 - HTTP status: `401`
 - `error.status`: `2`
-- Message: `TODOIST_ACCESS_TOKEN is not set`
+- Message: `request token is not set`
 
 ### 6.3 Upstream API errors
 - HTTP status: upstream status if in `400..599`.
@@ -190,6 +179,7 @@ The service supports exactly these method names:
 - `task.create`
 - `task.update`
 - `task.delete`
+- `task.close`
 - `project.list`
 - `project.get`
 - `project.create`
@@ -226,11 +216,11 @@ The service supports exactly these method names:
 - `task.create`
   - Upstream: `POST /tasks`
   - Required: `name`
-  - Optional: `description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`
+  - Optional: `description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`, `sectionId`, `section_id`
   - Body adaptation:
     - `name` -> `content`
     - `projectId` -> `project_id`
-    - `taskGroupId` -> `section_id`
+    - section alias resolution (`taskGroupId`, `sectionId`, `section_id`) -> `section_id`
     - `date`/`startDate` -> `due_date` (if date-only) or `due_datetime`
     - `endDate` -> `deadline_date` (first 10 chars for datetime strings)
     - `priority` normalized to Todoist scale (`1..4`).
@@ -239,6 +229,8 @@ The service supports exactly these method names:
   - Same field mapping as `task.create`.
 - `task.delete`
   - Upstream: `DELETE /tasks/{task_id}`.
+- `task.close`
+  - Upstream: `POST /tasks/{task_id}/close`.
 
 ### 8.2 Projects
 - `project.list` -> `GET /projects`
@@ -350,6 +342,7 @@ Implemented in:
 ### 12.1 Envelope and deletes
 - Always returns `{"d": ...}`.
 - For any `.delete` method: `{"d":{"ok":1}}` regardless of upstream payload.
+- For `task.close`: `{"d":{"ok":1}}` regardless of upstream payload.
 
 ### 12.2 Datetime conversion
 - Datetime-like strings are converted to MSK (`+03:00`) with seconds precision.
@@ -366,6 +359,7 @@ Implemented in:
   - `n` (name/content/title),
   - `d` (description/note),
   - `s` (date/datetime start-like field),
+  - `tg` (section/task-group id),
   - `c` (checklist/subtasks list mapped to checklist projection).
 - Project fields:
   - `n`, `d`.
@@ -447,6 +441,7 @@ curl -sS http://127.0.0.1:8080/methods
 ### 16.2 Raw task get
 ```bash
 curl -sS -X POST http://127.0.0.1:8080/raw/task.get \
+  -H "Authorization: Bearer <token>" \
   -H 'content-type: application/json' \
   -d '{"task_id":"12345"}'
 ```
@@ -454,6 +449,7 @@ curl -sS -X POST http://127.0.0.1:8080/raw/task.get \
 ### 16.3 TOON task list
 ```bash
 curl -sS -X POST http://127.0.0.1:8080/toon/task.list \
+  -H "Authorization: Bearer <token>" \
   -H 'content-type: application/json' \
   -d '{"page":1,"size":20}'
 ```
@@ -461,8 +457,17 @@ curl -sS -X POST http://127.0.0.1:8080/toon/task.list \
 ### 16.4 Default TOON mode
 ```bash
 curl -sS -X POST http://127.0.0.1:8080/task.list \
+  -H "Authorization: Bearer <token>" \
   -H 'content-type: application/json' \
   -d '{"page":1,"size":20}'
+```
+
+### 16.5 Close task (TOON)
+```bash
+curl -sS -X POST http://127.0.0.1:8080/toon/task.close \
+  -H "Authorization: Bearer <token>" \
+  -H 'content-type: application/json' \
+  -d '{"task_id":"12345"}'
 ```
 
 ## 17. Known Behavior Notes
@@ -470,3 +475,14 @@ curl -sS -X POST http://127.0.0.1:8080/task.list \
 - `page` and `size` are compatibility fields for local TOON pagination fallback.
 - `project.description` and `section.description` are accepted by schema for compatibility but currently not sent to Todoist in adaptation layer.
 - The service intentionally uses WSGI stdlib server entrypoint for minimal runtime dependencies.
+
+## 18. API Call Logging
+
+Implemented in:
+- `/Users/exy/pet_projects/TodoistAPIProxy/src/todoist_proxy/client.py`
+
+Behavior:
+- Every outbound call to Todoist API writes one JSON line.
+- Log file path pattern: `/tmp/logs_YYYYMMDD.log` (one file per day).
+- Each line includes timestamp, method, URL, status, token scope fingerprint, elapsed time, and optional error message.
+- Logging is best-effort and does not break request handling if file write fails.

@@ -57,8 +57,9 @@ def _task_payload_to_todoist(payload: JsonDict) -> JsonDict:
         body["description"] = payload["description"]
     if "projectId" in payload:
         body["project_id"] = payload["projectId"]
-    if "taskGroupId" in payload:
-        body["section_id"] = payload["taskGroupId"]
+    section_id = _task_section_id(payload)
+    if section_id is not None:
+        body["section_id"] = section_id
     labels = _normalize_labels(payload.get("labels"))
     if labels:
         body["labels"] = labels
@@ -81,6 +82,17 @@ def _task_payload_to_todoist(payload: JsonDict) -> JsonDict:
         body["deadline_date"] = end_date[:10] if len(end_date) >= 10 else end_date
 
     return body
+
+
+def _task_section_id(payload: JsonDict) -> str | None:
+    for key in ("taskGroupId", "sectionId", "section_id"):
+        value = payload.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
 
 
 def _normalize_labels(value: Any) -> list[str]:

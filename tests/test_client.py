@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import sys
@@ -41,6 +42,18 @@ class DummySession:
 
 
 class ClientTests(unittest.TestCase):
+    def test_missing_token_raises_even_when_env_is_set(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "TODOIST_ACCESS_TOKEN": "env-access-token",
+                "TODOIST_API_TOKEN": "env-api-token",
+            },
+            clear=False,
+        ):
+            with self.assertRaises(MissingTokenError):
+                TodoistClient()
+
     def test_missing_token_raises(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(MissingTokenError):
@@ -60,6 +73,32 @@ class ClientTests(unittest.TestCase):
         self.assertEqual("Bearer abc123", session.last_call["headers"]["Authorization"])
         self.assertEqual(5, session.last_call["timeout"])
         limiter.acquire.assert_called_once_with(client.token_scope)
+
+    def test_api_call_is_logged_to_daily_file(self) -> None:
+        response = DummyResponse(status_code=200, payload={"ok": True})
+        session = DummySession(response)
+        limiter = mock.Mock()
+        client = TodoistClient(token="abc123", session=session, rate_limiter=limiter)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            def _fake_log_path(now):
+                return os.path.join(tmp_dir, f"logs_{now.strftime('%Y%m%d')}.log")
+
+            with mock.patch("todoist_proxy.client._api_log_file_path", side_effect=_fake_log_path):
+                client.request(RequestSpec(method="GET", path="/tasks", query={}, body={}))
+
+            files = os.listdir(tmp_dir)
+            self.assertEqual(1, len(files))
+
+            log_path = os.path.join(tmp_dir, files[0])
+            with open(log_path, "r", encoding="utf-8") as fp:
+                line = fp.readline().strip()
+
+        entry = json.loads(line)
+        self.assertEqual("GET", entry["method"])
+        self.assertEqual("https://api.todoist.com/api/v1/tasks", entry["url"])
+        self.assertEqual(200, entry["status"])
+        self.assertEqual(client.token_scope, entry["token_scope"])
 
     def test_api_error_raises(self) -> None:
         response = DummyResponse(status_code=401, payload={"message": "Unauthorized"})

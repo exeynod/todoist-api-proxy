@@ -513,6 +513,8 @@ class LiveIntegrationRunner:
                 expected_status=200,
             )
             self._assert_toon_envelope(f"TOON {method_name}", toon_payload)
+            if method_name == "task.get":
+                self._assert_toon_task_section_ref("TOON task.get", toon_payload, self.main_section_id)
             default_payload = self._assert_request(
                 f"DEFAULT {method_name}",
                 "POST",
@@ -521,6 +523,8 @@ class LiveIntegrationRunner:
                 expected_status=200,
             )
             self._assert_toon_envelope(f"DEFAULT {method_name}", default_payload)
+            if method_name == "task.get":
+                self._assert_toon_task_section_ref("DEFAULT task.get", default_payload, self.main_section_id)
 
     def _test_write_methods_all_modes(self) -> None:
         # Task update on main task
@@ -824,6 +828,60 @@ class LiveIntegrationRunner:
             id_field_hint="id",
             track_collection=self.created_sections,
         )
+
+        # Task close coverage.
+        close_raw_seed = self._assert_request(
+            "SEED task.create for RAW task.close",
+            "POST",
+            "/raw/task.create",
+            payload={"name": f"IT-PROXY {self.run_id} close raw", "projectId": self.main_project_id},
+            expected_status=200,
+        )
+        close_raw_id = self._extract_id("SEED task.create for RAW task.close", close_raw_seed)
+        self.created_tasks.append(close_raw_id)
+        self._assert_request(
+            "RAW task.close",
+            "POST",
+            "/raw/task.close",
+            payload={"task_id": close_raw_id},
+            expected_status=200,
+        )
+
+        close_toon_seed = self._assert_request(
+            "SEED task.create for TOON task.close",
+            "POST",
+            "/raw/task.create",
+            payload={"name": f"IT-PROXY {self.run_id} close toon", "projectId": self.main_project_id},
+            expected_status=200,
+        )
+        close_toon_id = self._extract_id("SEED task.create for TOON task.close", close_toon_seed)
+        self.created_tasks.append(close_toon_id)
+        toon_task_close = self._assert_request(
+            "TOON task.close",
+            "POST",
+            "/toon/task.close",
+            payload={"task_id": close_toon_id},
+            expected_status=200,
+        )
+        self._assert_equal("TOON task.close", toon_task_close, {"d": {"ok": 1}})
+
+        close_default_seed = self._assert_request(
+            "SEED task.create for DEFAULT task.close",
+            "POST",
+            "/raw/task.create",
+            payload={"name": f"IT-PROXY {self.run_id} close default", "projectId": self.main_project_id},
+            expected_status=200,
+        )
+        close_default_id = self._extract_id("SEED task.create for DEFAULT task.close", close_default_seed)
+        self.created_tasks.append(close_default_id)
+        default_task_close = self._assert_request(
+            "DEFAULT task.close",
+            "POST",
+            "/task.close",
+            payload={"task_id": close_default_id},
+            expected_status=200,
+        )
+        self._assert_equal("DEFAULT task.close", default_task_close, {"d": {"ok": 1}})
 
     def _create_update_delete_entity_matrix(
         self,
@@ -1158,6 +1216,7 @@ class LiveIntegrationRunner:
             "task.create",
             "task.update",
             "task.delete",
+            "task.close",
             "project.list",
             "project.get",
             "project.create",
@@ -1215,6 +1274,24 @@ class LiveIntegrationRunner:
             False,
             None,
             f"expected={expected!r} actual={actual!r}",
+        )
+
+    def _assert_toon_task_section_ref(self, name: str, payload: Any, expected_section_id: str | None) -> None:
+        task = payload.get("d") if isinstance(payload, dict) else None
+        section_ref = task.get("tg") if isinstance(task, dict) else None
+        if section_ref == expected_section_id:
+            self._record(
+                f"ASSERT {name} section ref",
+                True,
+                200,
+                f"tg matches expected section id ({expected_section_id})",
+            )
+            return
+        self._record(
+            f"ASSERT {name} section ref",
+            False,
+            None,
+            f"expected tg={expected_section_id!r}, got={section_ref!r}, payload={payload!r}",
         )
 
     def _extract_toon_task_names(self, payload: Any) -> set[str]:

@@ -32,7 +32,11 @@ Use this skill for any user request about Todoist data (tasks, projects, section
   - `POST /toon/{method}`
   - `POST /{method}` (default TOON mode)
 - Use `curl` only for Todoist proxy calls. Do not use Python or other HTTP clients by default.
-- Default to TOON mode unless user explicitly asks for raw upstream JSON.
+- Default to TOON mode.
+- Absolute rule: never call any `/raw/*` endpoint without explicit user permission in the current dialogue.
+- Consider permission explicit only when user directly asks for RAW mode/endpoints.
+- Requests like "show JSON" are not RAW permission by themselves; ask first and wait for confirmation.
+- RAW permission is one-time and does not carry over to future requests.
 - Headers:
   - `Authorization: Bearer ${TODOIST_USER_TOKEN}` (preferred)
   - `X-TODOIST-ACCESS-TOKEN: ${TODOIST_USER_TOKEN}` (fallback)
@@ -50,6 +54,7 @@ Use this skill for any user request about Todoist data (tasks, projects, section
 - If the task requires 2+ requests (for example id resolution + target action), ask user for explicit approval before making additional requests.
 - If pagination requires additional requests (`next_cursor`), ask user for explicit approval before fetching the next page(s).
 - If implementation would require Python (or any non-`curl` transport), ask user for explicit approval first.
+- RAW mode guardrail: without explicit user permission, `/raw/*` is forbidden; always use TOON/default routes.
 - If request is outside supported functionality, state that it is not supported and do not improvise workaround logic.
 - Do not attempt to fix infrastructure/network/auth issues on your own:
   - do not restart services/containers,
@@ -73,6 +78,7 @@ Choose the minimal required sequence of these methods based on user intent:
 | `task.create` | Create task. | `name` |
 | `task.update` | Update task. | `task_id` |
 | `task.delete` | Delete task. | `task_id` |
+| `task.close` | Close task. | `task_id` |
 | `project.list` | List projects. | none |
 | `project.get` | Get project details. | `project_id` |
 | `project.create` | Create project. | `name` |
@@ -92,7 +98,7 @@ Choose the minimal required sequence of these methods based on user intent:
 - Pagination for task list methods: `cursor`, `limit` (upstream) and `page`, `size` (local fallback in TOON mode).
 - `task.list_by_date` TOON safety: tasks without matching due date are excluded.
 - `GET /tasks/today` TOON safety: tasks without due date are excluded; only due `<= today`.
-- Task creation/update optional fields: `description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`.
+- Task creation/update optional fields: `description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`, `sectionId`, `section_id`.
 - Checklist completion toggle: `isCompleted` (`true`/`false`).
 
 ## Body Construction Rules
@@ -109,10 +115,14 @@ Choose the minimal required sequence of these methods based on user intent:
     - If datetime string: due datetime.
     - If both present, `startDate` has priority over `date`.
   - `endDate` maps to deadline date.
-  - `projectId` and `taskGroupId` set project/section.
+  - `projectId` and (`taskGroupId` or `sectionId` or `section_id`) set project/section.
 - For `task.update`:
   - Required: `task_id`.
-  - Optional body fields follow `task.create` rules (`description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`, `labels`).
+  - Optional body fields follow `task.create` rules (`description`, `date`, `startDate`, `endDate`, `priority`, `projectId`, `taskGroupId`, `sectionId`, `section_id`, `labels`).
+- For `task.close`:
+  - Required: `task_id`.
+  - Use `POST ${TODOIST_PROXY_BASE_URL}/toon/task.close` by default.
+  - `/raw/task.close` is forbidden without explicit user permission.
 - Do not send unknown fields; if unsure, check `GET /methods` first.
 
 ## Response Rules
@@ -121,7 +131,8 @@ Choose the minimal required sequence of these methods based on user intent:
 - TOON list methods: `d` is an array.
 - TOON list methods may include `next_cursor` when upstream returns it.
 - TOON get/create/update methods: `d` is an object.
-- TOON delete methods: `{"d":{"ok":1}}`.
+- TOON delete/close methods: `{"d":{"ok":1}}`.
+- TOON task objects may include section reference key `tg` (task section id).
 - Error payload: `{"error":{"status":<int>,"message":"<text>"}}`.
 
 ## Practical Examples

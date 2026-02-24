@@ -112,6 +112,35 @@ class ServiceTests(unittest.TestCase):
             call.body,
         )
 
+    def test_task_update_maps_section_alias_to_section_id(self) -> None:
+        client = RecordingClient(responses=[{"id": "t1"}])
+
+        execute_method(
+            client,
+            "task.update",
+            {
+                "task_id": "t1",
+                "sectionId": "s2",
+                "name": "Task Updated",
+            },
+        )
+
+        call = client.calls[0]
+        self.assertEqual("POST", call.method)
+        self.assertEqual("/tasks/t1", call.path)
+        self.assertEqual({"content": "Task Updated", "section_id": "s2"}, call.body)
+
+    def test_task_close_calls_close_endpoint(self) -> None:
+        client = RecordingClient(responses=[{}])
+
+        result = execute_method(client, "task.close", {"task_id": "t1"})
+
+        self.assertEqual({}, result)
+        call = client.calls[0]
+        self.assertEqual("POST", call.method)
+        self.assertEqual("/tasks/t1/close", call.path)
+        self.assertEqual({}, call.body)
+
     def test_checklist_create_with_completed_closes_created_subtask(self) -> None:
         client = RecordingClient(responses=[{"id": "c1", "content": "Sub"}, {}])
 
