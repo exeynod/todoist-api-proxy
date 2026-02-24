@@ -919,7 +919,7 @@ class LiveIntegrationRunner:
         )
         track_collection[:] = [item for item in track_collection if item != raw_id]
 
-        # toon mode (seed id via RAW create because TOON output intentionally hides ids)
+        # toon mode
         toon_seed = self._assert_request(
             f"SEED RAW {entity}.create for TOON flow",
             "POST",
@@ -935,11 +935,15 @@ class LiveIntegrationRunner:
             expected_status=200,
         )
         self._assert_toon_envelope(f"TOON {entity}.create (smoke)", toon_create_smoke)
-        toon_smoke_name = self._payload_with_name_suffix(create_payload, "toon-smoke").get("name")
-        if isinstance(toon_smoke_name, str):
-            toon_smoke_id = self._find_entity_id_by_name(entity=entity, name=toon_smoke_name, create_payload=create_payload)
-            if toon_smoke_id:
-                track_collection.append(toon_smoke_id)
+        toon_smoke_id = self._extract_toon_entity_id(toon_create_smoke)
+        if toon_smoke_id:
+            track_collection.append(toon_smoke_id)
+        else:
+            toon_smoke_name = self._payload_with_name_suffix(create_payload, "toon-smoke").get("name")
+            if isinstance(toon_smoke_name, str):
+                toon_smoke_id = self._find_entity_id_by_name(entity=entity, name=toon_smoke_name, create_payload=create_payload)
+                if toon_smoke_id:
+                    track_collection.append(toon_smoke_id)
         toon_id = self._extract_id(f"SEED RAW {entity}.create for TOON flow", toon_seed, id_field=id_field_hint)
         track_collection.append(toon_id)
         toon_updated = self._assert_request(
@@ -960,7 +964,7 @@ class LiveIntegrationRunner:
         self._assert_equal(f"TOON {entity}.delete", toon_deleted, {"d": {"ok": 1}})
         track_collection[:] = [item for item in track_collection if item != toon_id]
 
-        # default mode (seed id via RAW create because TOON output intentionally hides ids)
+        # default mode
         default_seed = self._assert_request(
             f"SEED RAW {entity}.create for DEFAULT flow",
             "POST",
@@ -976,15 +980,19 @@ class LiveIntegrationRunner:
             expected_status=200,
         )
         self._assert_toon_envelope(f"DEFAULT {entity}.create (smoke)", default_create_smoke)
-        default_smoke_name = self._payload_with_name_suffix(create_payload, "default-smoke").get("name")
-        if isinstance(default_smoke_name, str):
-            default_smoke_id = self._find_entity_id_by_name(
-                entity=entity,
-                name=default_smoke_name,
-                create_payload=create_payload,
-            )
-            if default_smoke_id:
-                track_collection.append(default_smoke_id)
+        default_smoke_id = self._extract_toon_entity_id(default_create_smoke)
+        if default_smoke_id:
+            track_collection.append(default_smoke_id)
+        else:
+            default_smoke_name = self._payload_with_name_suffix(create_payload, "default-smoke").get("name")
+            if isinstance(default_smoke_name, str):
+                default_smoke_id = self._find_entity_id_by_name(
+                    entity=entity,
+                    name=default_smoke_name,
+                    create_payload=create_payload,
+                )
+                if default_smoke_id:
+                    track_collection.append(default_smoke_id)
         default_id = self._extract_id(
             f"SEED RAW {entity}.create for DEFAULT flow",
             default_seed,
@@ -1331,6 +1339,14 @@ class LiveIntegrationRunner:
             return str(payload[id_field])
         self._record(name, False, None, f"cannot extract '{id_field}' from payload={payload!r}")
         raise RuntimeError(f"failed to extract id for case: {name}")
+
+    def _extract_toon_entity_id(self, payload: Any) -> str | None:
+        if not isinstance(payload, dict):
+            return None
+        data = payload.get("d")
+        if isinstance(data, dict) and data.get("i") is not None:
+            return str(data["i"])
+        return None
 
     def _assert_request(
         self,

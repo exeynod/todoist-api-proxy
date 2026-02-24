@@ -97,7 +97,16 @@ def _handle_request(
             if cached_response is not None:
                 return 200, cached_response
 
-        raw_result = execute_method(client, method_name, payload)
+        _set_client_log_context(
+            client,
+            mode=mode,
+            request_path=path,
+            method_name=method_name,
+        )
+        try:
+            raw_result = execute_method(client, method_name, payload)
+        finally:
+            _clear_client_log_context(client)
     except InputValidationError as exc:
         raise ProxyHttpError(http_status=400, error_status=EXIT_VALIDATION, message=str(exc)) from exc
     except ApiError as exc:
@@ -150,7 +159,16 @@ def _handle_today_tasks_request(
         body={},
     )
     try:
-        raw_result = client.request(spec)
+        _set_client_log_context(
+            client,
+            mode="toon",
+            request_path="/tasks/today",
+            method_name="task.list_today",
+        )
+        try:
+            raw_result = client.request(spec)
+        finally:
+            _clear_client_log_context(client)
     except ApiError as exc:
         http_status = exc.status if 400 <= exc.status <= 599 else 502
         error_status = exc.status if exc.status > 0 else EXIT_API_ERROR
@@ -302,6 +320,29 @@ def _build_client(client_factory: Callable[..., Any], token: str | None) -> Any:
         return client_factory(token)
     except TypeError:
         return client_factory()
+
+
+def _set_client_log_context(
+    client: Any,
+    *,
+    mode: str,
+    request_path: str,
+    method_name: str,
+) -> None:
+    setattr(
+        client,
+        "_proxy_log_context",
+        {
+            "mode": mode,
+            "path": request_path,
+            "method_name": method_name,
+        },
+    )
+
+
+def _clear_client_log_context(client: Any) -> None:
+    if hasattr(client, "_proxy_log_context"):
+        delattr(client, "_proxy_log_context")
 
 
 app = create_app()

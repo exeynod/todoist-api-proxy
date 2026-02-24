@@ -100,6 +100,36 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(200, entry["status"])
         self.assertEqual(client.token_scope, entry["token_scope"])
 
+    def test_api_call_log_includes_proxy_context_when_present(self) -> None:
+        response = DummyResponse(status_code=200, payload={"ok": True})
+        session = DummySession(response)
+        limiter = mock.Mock()
+        client = TodoistClient(token="abc123", session=session, rate_limiter=limiter)
+        client._proxy_log_context = {  # type: ignore[attr-defined]
+            "mode": "raw",
+            "path": "/raw/task.get",
+            "method_name": "task.get",
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            def _fake_log_path(now):
+                return os.path.join(tmp_dir, f"logs_{now.strftime('%Y%m%d')}.log")
+
+            with mock.patch("todoist_proxy.client._api_log_file_path", side_effect=_fake_log_path):
+                client.request(RequestSpec(method="GET", path="/tasks/t1", query={}, body={}))
+
+            files = os.listdir(tmp_dir)
+            self.assertEqual(1, len(files))
+
+            log_path = os.path.join(tmp_dir, files[0])
+            with open(log_path, "r", encoding="utf-8") as fp:
+                line = fp.readline().strip()
+
+        entry = json.loads(line)
+        self.assertEqual("raw", entry["proxy_mode"])
+        self.assertEqual("/raw/task.get", entry["proxy_path"])
+        self.assertEqual("task.get", entry["proxy_method"])
+
     def test_api_error_raises(self) -> None:
         response = DummyResponse(status_code=401, payload={"message": "Unauthorized"})
         session = DummySession(response)

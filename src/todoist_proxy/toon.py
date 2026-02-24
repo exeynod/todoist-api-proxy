@@ -37,7 +37,7 @@ _LIST_CONTAINER_KEYS = (
 )
 _PAGINATION_CURSOR_KEYS = ("next_cursor", "nextCursor")
 _NOTE_POINTER_RE = re.compile(r"^N-[A-Za-z0-9-]+$")
-_META_FIELDS = {"i", "p", "x"}
+_META_FIELDS = {"p", "x"}
 
 
 def to_toon_response(

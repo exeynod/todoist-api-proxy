@@ -356,21 +356,22 @@ Implemented in:
 
 ### 12.4 Entity projection
 - Task fields projected into compact keys:
+  - `i` (task id),
   - `n` (name/content/title),
   - `d` (description/note),
   - `s` (date/datetime start-like field),
   - `tg` (section/task-group id),
   - `c` (checklist/subtasks list mapped to checklist projection).
 - Project fields:
-  - `n`, `d`.
+  - `i`, `n`, `d`.
 - Section fields:
-  - `n`, `d`, `pr`.
+  - `i`, `n`, `d`, `pr`.
 - Checklist item fields:
-  - `n`.
+  - `i`, `n`.
 
 ### 12.5 Meta compaction
 - Meta keys are removed from final TOON payload:
-  - `i`, `p`, `x`.
+  - `p`, `x`.
 - Null/empty strings/empty arrays/empty objects are compacted away.
 
 ### 12.6 Local pagination fallback
@@ -485,4 +486,8 @@ Behavior:
 - Every outbound call to Todoist API writes one JSON line.
 - Log file path pattern: `/tmp/logs_YYYYMMDD.log` (one file per day).
 - Each line includes timestamp, method, URL, status, token scope fingerprint, elapsed time, and optional error message.
+- Each line also includes proxy request context:
+  - `proxy_mode` (`raw` or `toon`);
+  - `proxy_path` (for example `/raw/task.get`, `/toon/task.list`, `/task.list`, `/tasks/today`);
+  - `proxy_method` (resolved catalog method, for example `task.get` or `task.list_today`).
 - Logging is best-effort and does not break request handling if file write fails.

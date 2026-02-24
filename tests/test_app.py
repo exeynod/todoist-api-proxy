@@ -48,6 +48,19 @@ class MutationAwareClient:
         return {"ok": True}
 
 
+class ContextAwareClient:
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = []
+        self.contexts = []
+
+    def request(self, spec):
+        self.calls.append(spec)
+        context = getattr(self, "_proxy_log_context", None)
+        self.contexts.append(dict(context) if isinstance(context, dict) else None)
+        return self.payload
+
+
 def call_wsgi(app, method: str, path: str, body: bytes = b"", headers: dict[str, str] | None = None):
     environ = {}
     setup_testing_defaults(environ)
@@ -115,7 +128,7 @@ class AppTests(unittest.TestCase):
         )
 
         self.assertEqual(200, status)
-        self.assertEqual({"d": [{"n": "Task 1", "s": today}], "next_cursor": "cursor-2"}, payload)
+        self.assertEqual({"d": [{"i": "t1", "n": "Task 1", "s": today}], "next_cursor": "cursor-2"}, payload)
         self.assertEqual(1, len(client.calls))
         call = client.calls[0]
         self.assertEqual("GET", call.method)
@@ -211,7 +224,55 @@ class AppTests(unittest.TestCase):
         status, payload = call_wsgi(app, "POST", "/task.list", body=b'{"page":1,"size":1}')
 
         self.assertEqual(200, status)
-        self.assertEqual({"d": [{"n": "Task 1"}]}, payload)
+        self.assertEqual({"d": [{"i": "t1", "n": "Task 1"}]}, payload)
+
+    def test_raw_route_sets_proxy_log_context(self) -> None:
+        client = ContextAwareClient({"id": "t1", "content": "Task"})
+        app = create_app(client_factory=lambda token=None: client)
+
+        status, _ = call_wsgi(
+            app,
+            "POST",
+            "/raw/task.get",
+            body=b'{"task_id":"t1"}',
+            headers={"Authorization": "Bearer token-a"},
+        )
+
+        self.assertEqual(200, status)
+        self.assertEqual(1, len(client.contexts))
+        self.assertEqual(
+            {
+                "mode": "raw",
+                "path": "/raw/task.get",
+                "method_name": "task.get",
+            },
+            client.contexts[0],
+        )
+        self.assertFalse(hasattr(client, "_proxy_log_context"))
+
+    def test_today_route_sets_proxy_log_context(self) -> None:
+        today = date.today().isoformat()
+        client = ContextAwareClient({"results": [{"id": "t1", "content": "Task 1", "due": {"date": today}}]})
+        app = create_app(client_factory=lambda token=None: client)
+
+        status, _ = call_wsgi(
+            app,
+            "GET",
+            "/tasks/today?limit=10",
+            headers={"Authorization": "Bearer token-a"},
+        )
+
+        self.assertEqual(200, status)
+        self.assertEqual(1, len(client.contexts))
+        self.assertEqual(
+            {
+                "mode": "toon",
+                "path": "/tasks/today",
+                "method_name": "task.list_today",
+            },
+            client.contexts[0],
+        )
+        self.assertFalse(hasattr(client, "_proxy_log_context"))
 
     def test_unknown_method_fails_with_validation_status(self) -> None:
         app = create_app(client_factory=lambda token=None: DummyClient({}))

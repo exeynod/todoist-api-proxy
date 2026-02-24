@@ -34,9 +34,12 @@ Use this skill for any user request about Todoist data (tasks, projects, section
 - Use `curl` only for Todoist proxy calls. Do not use Python or other HTTP clients by default.
 - Default to TOON mode.
 - Absolute rule: never call any `/raw/*` endpoint without explicit user permission in the current dialogue.
-- Consider permission explicit only when user directly asks for RAW mode/endpoints.
-- Requests like "show JSON" are not RAW permission by themselves; ask first and wait for confirmation.
-- RAW permission is one-time and does not carry over to future requests.
+- Hard-stop RAW gate:
+  - explicit permission means user directly asks for `RAW` or `/raw/*` in the current dialogue;
+  - requests like "show JSON" are not RAW permission;
+  - if permission is missing, ask one short yes/no question and stop;
+  - RAW permission is one-time and does not carry over to future requests.
+- "Need IDs" is never a valid reason to bypass this gate.
 - Headers:
   - `Authorization: Bearer ${TODOIST_USER_TOKEN}` (preferred)
   - `X-TODOIST-ACCESS-TOKEN: ${TODOIST_USER_TOKEN}` (fallback)
@@ -64,6 +67,8 @@ Use this skill for any user request about Todoist data (tasks, projects, section
 - If required method inputs are missing, ask only for missing required fields.
 - Use the minimal required sequence of method calls (single-call if enough; multi-call only when needed).
 - If user gives a project/section/task name instead of id, first resolve id via supported list/get methods, then call the target method.
+- TOON/default payloads contain entity ids in key `i`; store and reuse them in follow-up steps to avoid repeated lookups.
+- Do not claim a RAW call was executed unless your actual request path contained `/raw/`.
 
 ## Method Selection
 
@@ -132,6 +137,7 @@ Choose the minimal required sequence of these methods based on user intent:
 - TOON list methods may include `next_cursor` when upstream returns it.
 - TOON get/create/update methods: `d` is an object.
 - TOON delete/close methods: `{"d":{"ok":1}}`.
+- TOON entity objects include `i` (entity id) for tasks, projects, sections, checklist items.
 - TOON task objects may include section reference key `tg` (task section id).
 - Error payload: `{"error":{"status":<int>,"message":"<text>"}}`.
 
@@ -144,6 +150,7 @@ Choose the minimal required sequence of these methods based on user intent:
 2. "Покажи задачи по работе":
    - Call `POST ${TODOIST_PROXY_BASE_URL}/toon/project.list`, resolve project id for "Работа".
    - Call `POST ${TODOIST_PROXY_BASE_URL}/toon/task.list_by_project` with `{"project_id":"<id>"}`.
+   - Reuse `i` values from `response.d` for any follow-up update/delete/close actions.
    - If response has `next_cursor` and user approved additional requests, continue with `{"project_id":"<id>","cursor":"<next_cursor>","limit":<N>}`.
    - Return concise list from `response.d`.
 

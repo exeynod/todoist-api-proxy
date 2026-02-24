@@ -110,6 +110,17 @@ class TodoistClient:
             raise
         finally:
             elapsed_ms = (time.monotonic() - started_at) * 1000.0
+            log_context = getattr(self, "_proxy_log_context", None)
+            proxy_mode = None
+            proxy_path = None
+            proxy_method = None
+            if isinstance(log_context, dict):
+                mode_value = log_context.get("mode")
+                path_value = log_context.get("path")
+                method_value = log_context.get("method_name")
+                proxy_mode = str(mode_value) if mode_value else None
+                proxy_path = str(path_value) if path_value else None
+                proxy_method = str(method_value) if method_value else None
             _append_api_call_log(
                 method=spec.method,
                 url=url,
@@ -117,6 +128,9 @@ class TodoistClient:
                 token_scope=self.token_scope,
                 elapsed_ms=elapsed_ms,
                 error=error_message,
+                proxy_mode=proxy_mode,
+                proxy_path=proxy_path,
+                proxy_method=proxy_method,
             )
 
 
@@ -160,6 +174,9 @@ def _append_api_call_log(
     token_scope: str,
     elapsed_ms: float,
     error: str | None,
+    proxy_mode: str | None = None,
+    proxy_path: str | None = None,
+    proxy_method: str | None = None,
 ) -> None:
     now = datetime.now()
     payload: dict[str, Any] = {
@@ -170,6 +187,12 @@ def _append_api_call_log(
         "token_scope": token_scope,
         "elapsed_ms": round(elapsed_ms, 3),
     }
+    if proxy_mode:
+        payload["proxy_mode"] = proxy_mode
+    if proxy_path:
+        payload["proxy_path"] = proxy_path
+    if proxy_method:
+        payload["proxy_method"] = proxy_method
     if error:
         payload["error"] = error
 

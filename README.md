@@ -20,6 +20,10 @@ Optional environment variables:
 
 API call logs:
 - Outbound Todoist API calls are appended to `/tmp/logs_YYYYMMDD.log` (one file per day, JSONL).
+- Each line includes upstream call data and proxy context:
+  - `proxy_mode` (`raw` or `toon`);
+  - `proxy_path` (for example `/raw/task.get`, `/toon/task.list`, `/task.list`, `/tasks/today`);
+  - `proxy_method` (resolved catalog method, for example `task.get`).
 
 ## Run
 ```bash
@@ -56,6 +60,7 @@ Every Todoist request must include token in headers:
 Task-specific notes:
 - `task.close` is supported (`POST /raw/task.close`, `POST /toon/task.close`, `POST /task.close`).
 - `task.create`/`task.update` accept section aliases: `taskGroupId`, `sectionId`, `section_id`.
+- TOON entity payloads include `i` (entity id) for tasks/projects/sections/checklist items.
 - TOON task payload may include `tg` (section id).
 
 ## Examples

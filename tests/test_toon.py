@@ -25,10 +25,11 @@ class ToonTests(unittest.TestCase):
         self.assertEqual(
             {
                 "d": {
+                    "i": "t1",
                     "n": "Task",
                     "d": "Desc",
                     "s": "2026-02-18T03:00:00+03:00",
-                    "c": [{"n": "item1"}],
+                    "c": [{"i": "c1", "n": "item1"}],
                 }
             },
             out,
@@ -79,6 +80,7 @@ class ToonTests(unittest.TestCase):
             {
                 "d": [
                     {
+                        "i": "t1",
                         "n": "Task",
                         "d": "Desc",
                         "s": "2026-02-18T03:00:00+03:00",
@@ -102,7 +104,7 @@ class ToonTests(unittest.TestCase):
         }
 
         out = to_toon_response("task.list", raw, request_input={"page": 2, "size": 1})
-        self.assertEqual({"d": [{"n": "Task 2"}]}, out)
+        self.assertEqual({"d": [{"i": "t2", "n": "Task 2"}]}, out)
 
     def test_task_list_page_greater_than_one_returns_empty_when_no_more_items(self) -> None:
         raw = {
@@ -122,7 +124,7 @@ class ToonTests(unittest.TestCase):
         }
 
         out = to_toon_response("task.list", raw)
-        self.assertEqual({"d": [{"n": "Task 1"}], "next_cursor": "cursor-1"}, out)
+        self.assertEqual({"d": [{"i": "t1", "n": "Task 1"}], "next_cursor": "cursor-1"}, out)
 
     def test_task_projection_includes_section_reference(self) -> None:
         raw = {
@@ -133,7 +135,7 @@ class ToonTests(unittest.TestCase):
         }
 
         out = to_toon_response("task.get", raw)
-        self.assertEqual({"d": {"n": "Task 1", "tg": "s1"}}, out)
+        self.assertEqual({"d": {"i": "t1", "n": "Task 1", "tg": "s1"}}, out)
 
     def test_task_list_by_date_filters_items_without_matching_due_date(self) -> None:
         raw = {
@@ -145,7 +147,7 @@ class ToonTests(unittest.TestCase):
         }
 
         out = to_toon_response("task.list_by_date", raw, request_input={"date": "2026-02-18"})
-        self.assertEqual({"d": [{"n": "Due date match", "s": "2026-02-18"}]}, out)
+        self.assertEqual({"d": [{"i": "t1", "n": "Due date match", "s": "2026-02-18"}]}, out)
 
     def test_task_list_today_filters_no_due_and_future_items(self) -> None:
         raw = {
@@ -161,8 +163,8 @@ class ToonTests(unittest.TestCase):
         self.assertEqual(
             {
                 "d": [
-                    {"n": "Overdue", "s": "2026-02-17"},
-                    {"n": "Today", "s": "2026-02-18"},
+                    {"i": "t1", "n": "Overdue", "s": "2026-02-17"},
+                    {"i": "t2", "n": "Today", "s": "2026-02-18"},
                 ]
             },
             out,
