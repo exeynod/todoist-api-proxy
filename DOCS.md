@@ -216,7 +216,7 @@ The service supports exactly these method names:
 - `task.create`
   - Upstream: `POST /tasks`
   - Required: `name`
-  - Optional: `description`, `date`, `startDate`, `endDate`, `priority`, `p`, `projectId`, `taskGroupId`, `sectionId`, `section_id`
+  - Optional: `description`, `date`, `startDate`, `endDate`, `priority`, `p`, `labels`, `l`, `projectId`, `taskGroupId`, `sectionId`, `section_id`
   - Body adaptation:
     - `name` -> `content`
     - `projectId` -> `project_id`
@@ -224,6 +224,7 @@ The service supports exactly these method names:
     - `date`/`startDate` -> `due_date` (if date-only) or `due_datetime`
     - `endDate` -> `deadline_date` (first 10 chars for datetime strings)
     - `priority`/`p` normalized to Todoist scale (`1..4`), including `P1..P4` notation.
+    - `labels`/`l` normalized to Todoist labels list (strings).
 - `task.update`
   - Upstream: `POST /tasks/{task_id}`
   - Same field mapping as `task.create`.

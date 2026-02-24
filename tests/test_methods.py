@@ -254,6 +254,19 @@ class MethodsTests(unittest.TestCase):
         )
         self.assertEqual({"p": 2}, update_request.body)
 
+    def test_task_create_and_update_accept_compact_labels_alias(self) -> None:
+        create_request = build_request(
+            "task.create",
+            {"name": "Task", "l": ["Work"]},
+        )
+        self.assertEqual({"name": "Task", "l": ["Work"]}, create_request.body)
+
+        update_request = build_request(
+            "task.update",
+            {"task_id": "t1", "l": ["Inbox", "Bug"]},
+        )
+        self.assertEqual({"l": ["Inbox", "Bug"]}, update_request.body)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -103,7 +103,10 @@ Choose the minimal required sequence of these methods based on user intent:
 - Pagination for task list methods: `cursor`, `limit` (upstream) and `page`, `size` (local fallback in TOON mode).
 - `task.list_by_date` TOON safety: tasks without matching due date are excluded.
 - `GET /tasks/today` TOON safety: tasks without due date are excluded; only due `<= today`.
-- Task creation/update optional fields: `description`, `date`, `startDate`, `endDate`, `priority`, `p`, `projectId`, `taskGroupId`, `sectionId`, `section_id`.
+- Task creation/update optional fields: `description`, `date`, `startDate`, `endDate`, `priority`, `p`, `labels`, `l`, `projectId`, `taskGroupId`, `sectionId`, `section_id`.
+- Priority scale for user-facing shorthand:
+  - maximum priority: `P1`;
+  - minimum priority: `P4`.
 - Checklist completion toggle: `isCompleted` (`true`/`false`).
 
 ## Body Construction Rules
@@ -123,7 +126,7 @@ Choose the minimal required sequence of these methods based on user intent:
   - `projectId` and (`taskGroupId` or `sectionId` or `section_id`) set project/section.
 - For `task.update`:
   - Required: `task_id`.
-  - Optional body fields follow `task.create` rules (`description`, `date`, `startDate`, `endDate`, `priority`, `p`, `projectId`, `taskGroupId`, `sectionId`, `section_id`, `labels`).
+  - Optional body fields follow `task.create` rules (`description`, `date`, `startDate`, `endDate`, `priority`, `p`, `labels`, `l`, `projectId`, `taskGroupId`, `sectionId`, `section_id`).
 - For `task.close`:
   - Required: `task_id`.
   - Use `POST ${TODOIST_PROXY_BASE_URL}/toon/task.close` by default.
@@ -140,6 +143,7 @@ Choose the minimal required sequence of these methods based on user intent:
 - TOON entity objects include `i` (entity id) for tasks, projects, sections, checklist items.
 - TOON task objects may include `l` (labels list).
 - TOON task objects may include `p` (priority `1..4`).
+- Priority shorthand meaning: `P1` = highest, `P4` = lowest.
 - TOON task objects may include section reference key `tg` (task section id).
 - Error payload: `{"error":{"status":<int>,"message":"<text>"}}`.
 

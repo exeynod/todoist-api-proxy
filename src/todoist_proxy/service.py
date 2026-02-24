@@ -60,7 +60,10 @@ def _task_payload_to_todoist(payload: JsonDict) -> JsonDict:
     section_id = _task_section_id(payload)
     if section_id is not None:
         body["section_id"] = section_id
-    labels = _normalize_labels(payload.get("labels"))
+    labels_value = payload.get("labels")
+    if labels_value is None:
+        labels_value = payload.get("l")
+    labels = _normalize_labels(labels_value)
     if labels:
         body["labels"] = labels
 
@@ -110,6 +113,13 @@ def _normalize_labels(value: Any) -> list[str]:
                 label = item.strip()
                 if label:
                     labels.append(label)
+                continue
+            if isinstance(item, dict):
+                name = item.get("name")
+                if isinstance(name, str):
+                    label = name.strip()
+                    if label:
+                        labels.append(label)
         return labels
 
     return []

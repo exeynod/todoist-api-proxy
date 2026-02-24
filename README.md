@@ -61,6 +61,8 @@ Task-specific notes:
 - `task.close` is supported (`POST /raw/task.close`, `POST /toon/task.close`, `POST /task.close`).
 - `task.create`/`task.update` accept section aliases: `taskGroupId`, `sectionId`, `section_id`.
 - `task.create`/`task.update` accept priority in `priority` and compact alias `p`.
+- Priority shorthand: `P1` is highest, `P4` is lowest.
+- `task.create`/`task.update` accept labels in `labels` and compact alias `l`.
 - TOON entity payloads include `i` (entity id) for tasks/projects/sections/checklist items.
 - TOON task payload may include `l` (labels list).
 - TOON task payload may include `p` (priority `1..4`).
