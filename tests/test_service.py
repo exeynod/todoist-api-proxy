@@ -138,7 +138,7 @@ class ServiceTests(unittest.TestCase):
             "task.update",
             {
                 "task_id": "t1",
-                "p": 4,
+                "p": 1,
             },
         )
 
@@ -197,6 +197,40 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual("POST", call.method)
         self.assertEqual("/tasks", call.path)
         self.assertEqual({"content": "Task", "labels": ["Work"]}, call.body)
+
+    def test_task_update_supports_explicit_empty_labels_for_clear(self) -> None:
+        client = RecordingClient(responses=[{"id": "t1"}])
+
+        execute_method(
+            client,
+            "task.update",
+            {
+                "task_id": "t1",
+                "labels": [],
+            },
+        )
+
+        call = client.calls[0]
+        self.assertEqual("POST", call.method)
+        self.assertEqual("/tasks/t1", call.path)
+        self.assertEqual({"labels": []}, call.body)
+
+    def test_task_create_supports_explicit_empty_labels(self) -> None:
+        client = RecordingClient(responses=[{"id": "t1"}])
+
+        execute_method(
+            client,
+            "task.create",
+            {
+                "name": "Task",
+                "l": [],
+            },
+        )
+
+        call = client.calls[0]
+        self.assertEqual("POST", call.method)
+        self.assertEqual("/tasks", call.path)
+        self.assertEqual({"content": "Task", "labels": []}, call.body)
 
     def test_task_close_calls_close_endpoint(self) -> None:
         client = RecordingClient(responses=[{}])

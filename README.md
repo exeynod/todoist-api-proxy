@@ -60,12 +60,14 @@ Every Todoist request must include token in headers:
 Task-specific notes:
 - `task.close` is supported (`POST /raw/task.close`, `POST /toon/task.close`, `POST /task.close`).
 - `task.create`/`task.update` accept section aliases: `taskGroupId`, `sectionId`, `section_id`.
-- `task.create`/`task.update` accept priority in `priority` and compact alias `p`.
+- `task.create`/`task.update` accept priority in `priority` and compact alias `p` (`p` uses P-scale: `1` highest, `4` lowest).
 - Priority shorthand: `P1` is highest, `P4` is lowest.
 - `task.create`/`task.update` accept labels in `labels` and compact alias `l`.
+- To clear labels on update, pass an explicit empty array: `labels: []` (or `l: []`).
 - TOON entity payloads include `i` (entity id) for tasks/projects/sections/checklist items.
 - TOON task payload may include `l` (labels list).
-- TOON task payload may include `p` (priority `1..4`).
+- TOON task payload may include `p` (P-scale: `1` highest, `4` lowest).
+- TOON task payload may include `ca` (task created datetime).
 - TOON task payload may include `tg` (section id).
 
 ## Examples

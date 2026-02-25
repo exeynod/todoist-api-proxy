@@ -223,8 +223,10 @@ The service supports exactly these method names:
     - section alias resolution (`taskGroupId`, `sectionId`, `section_id`) -> `section_id`
     - `date`/`startDate` -> `due_date` (if date-only) or `due_datetime`
     - `endDate` -> `deadline_date` (first 10 chars for datetime strings)
-    - `priority`/`p` normalized to Todoist scale (`1..4`), including `P1..P4` notation.
+    - `priority` normalized to Todoist scale (`1..4`) and also accepts `P1..P4` notation.
+    - `p` is treated as P-scale (`1` highest / `P1`, `4` lowest / `P4`) and normalized to Todoist scale.
     - `labels`/`l` normalized to Todoist labels list (strings).
+    - Explicit empty labels list (`labels: []` or `l: []`) is forwarded to support label clearing.
 - `task.update`
   - Upstream: `POST /tasks/{task_id}`
   - Same field mapping as `task.create`.
@@ -361,8 +363,9 @@ Implemented in:
   - `n` (name/content/title),
   - `d` (description/note),
   - `s` (date/datetime start-like field),
+  - `ca` (created datetime),
   - `l` (labels list),
-  - `p` (priority `1..4`),
+  - `p` (priority P-scale `1..4`, where `1` = highest / `P1`),
   - `tg` (section/task-group id),
   - `c` (checklist/subtasks list mapped to checklist projection).
 - Project fields:

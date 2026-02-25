@@ -321,6 +321,7 @@ def _task_to_toon(task: dict[str, Any]) -> dict[str, Any]:
         "n": _clean_text(_first_present(task, "name", "title", "content")),
         "d": _task_description(task),
         "s": _task_start(task),
+        "ca": _task_created(task),
         "l": _task_labels(task),
         "tg": _task_section_ref(task),
         "p": _priority_to_int(task.get("priority")),
@@ -352,6 +353,10 @@ def _task_labels(task: dict[str, Any]) -> list[str]:
         if labels:
             return labels
     return []
+
+
+def _task_created(task: dict[str, Any]) -> Any:
+    return _first_present(task, "createdAt", "created_at", "addedAt", "added_at", "created")
 
 
 def _normalize_string_list(value: Any) -> list[str]:
@@ -428,29 +433,39 @@ def _priority_to_int(value: Any) -> int | None:
         "urgent": 4,
     }
 
+    api_priority: int | None = None
+    toon_priority: int | None = None
+
     if isinstance(value, int):
         if value in (1, 2, 3, 4):
-            return value
-        if value == 0:
-            return 1
-        return None
+            api_priority = value
+        elif value == 0:
+            api_priority = 1
+        else:
+            return None
 
     if isinstance(value, str):
         text = value.strip().lower()
         if not text:
             return None
         if text in named:
-            return named[text]
+            api_priority = named[text]
         if text.startswith("p") and len(text) == 2 and text[1].isdigit():
             level = int(text[1])
             if 1 <= level <= 4:
-                # Todoist clients use P1..P4, API stores 4..1.
-                return 5 - level
-        if text.isdigit():
+                toon_priority = level
+        elif text.isdigit():
             number = int(text)
             return _priority_to_int(number)
 
-    return None
+    if toon_priority is not None:
+        return toon_priority
+
+    if api_priority is None:
+        return None
+
+    # Todoist API stores 4..1 (highest..lowest), TOON uses P-scale 1..4.
+    return 5 - api_priority
 
 
 def _bool_to_int(value: Any) -> int:

@@ -61,16 +61,19 @@ def _task_payload_to_todoist(payload: JsonDict) -> JsonDict:
     if section_id is not None:
         body["section_id"] = section_id
     labels_value = payload.get("labels")
-    if labels_value is None:
+    if labels_value is None and "l" in payload:
         labels_value = payload.get("l")
     labels = _normalize_labels(labels_value)
     if labels:
         body["labels"] = labels
+    elif _is_explicit_empty_labels(labels_value):
+        body["labels"] = []
 
-    priority_value = payload.get("priority")
-    if priority_value is None:
-        priority_value = payload.get("p")
-    priority = _normalize_priority(priority_value)
+    priority: int | None = None
+    if payload.get("p") is not None:
+        priority = _normalize_priority(payload.get("p"), assume_toon_scale=True)
+    if priority is None:
+        priority = _normalize_priority(payload.get("priority"), assume_toon_scale=False)
     if priority is not None:
         body["priority"] = priority
 
@@ -125,7 +128,11 @@ def _normalize_labels(value: Any) -> list[str]:
     return []
 
 
-def _normalize_priority(value: Any) -> int | None:
+def _is_explicit_empty_labels(value: Any) -> bool:
+    return isinstance(value, list) and len(value) == 0
+
+
+def _normalize_priority(value: Any, *, assume_toon_scale: bool = False) -> int | None:
     named = {
         "natural": 1,
         "normal": 1,
@@ -135,27 +142,37 @@ def _normalize_priority(value: Any) -> int | None:
         "urgent": 4,
     }
 
+    api_priority: int | None = None
+    toon_priority: int | None = None
+
     if isinstance(value, int):
         if value in (1, 2, 3, 4):
-            return value
-        if value == 0:
-            return 1
-        return None
+            if assume_toon_scale:
+                toon_priority = value
+            else:
+                api_priority = value
+        elif value == 0:
+            api_priority = 1
+        else:
+            return None
     if isinstance(value, str):
         text = value.strip().lower()
         if not text:
             return None
         if text in named:
-            return named[text]
+            api_priority = named[text]
         if text.startswith("p") and len(text) == 2 and text[1].isdigit():
             level = int(text[1])
             if 1 <= level <= 4:
-                # Todoist clients use P1..P4, API stores 4..1.
-                return 5 - level
-        if text.isdigit():
-            return _normalize_priority(int(text))
+                toon_priority = level
+        elif text.isdigit():
+            return _normalize_priority(int(text), assume_toon_scale=assume_toon_scale)
 
-    return None
+    if toon_priority is not None:
+        # Todoist clients use P1..P4, API stores 4..1.
+        return 5 - toon_priority
+
+    return api_priority
 
 
 def _execute_checklist_create(client: Any, payload: JsonDict) -> Any:

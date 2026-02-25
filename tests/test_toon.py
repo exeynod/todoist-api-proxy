@@ -14,6 +14,7 @@ class ToonTests(unittest.TestCase):
             "content": "Task",
             "description": "Desc",
             "due": {"datetime": "2026-02-18T00:00:00Z"},
+            "createdAt": "2026-02-17T21:00:00Z",
             "priority": 4,
             "labels": ["Work", "Urgent"],
             "is_completed": False,
@@ -30,8 +31,9 @@ class ToonTests(unittest.TestCase):
                     "n": "Task",
                     "d": "Desc",
                     "s": "2026-02-18T03:00:00+03:00",
+                    "ca": "2026-02-18T00:00:00+03:00",
                     "l": ["Work", "Urgent"],
-                    "p": 4,
+                    "p": 1,
                     "c": [{"i": "c1", "n": "item1"}],
                 }
             },
@@ -89,7 +91,7 @@ class ToonTests(unittest.TestCase):
                         "d": "Desc",
                         "s": "2026-02-18T03:00:00+03:00",
                         "l": ["Work"],
-                        "p": 4,
+                        "p": 1,
                     }
                 ]
             },
@@ -142,6 +144,28 @@ class ToonTests(unittest.TestCase):
 
         out = to_toon_response("task.get", raw)
         self.assertEqual({"d": {"i": "t1", "n": "Task 1", "tg": "s1"}}, out)
+
+    def test_task_priority_mapping_uses_p_scale(self) -> None:
+        raw = {
+            "id": "t1",
+            "content": "Task 1",
+            "priority": 1,
+            "is_completed": False,
+        }
+
+        out = to_toon_response("task.get", raw)
+        self.assertEqual({"d": {"i": "t1", "n": "Task 1", "p": 4}}, out)
+
+    def test_task_projection_includes_created_datetime_from_created_at(self) -> None:
+        raw = {
+            "id": "t1",
+            "content": "Task 1",
+            "created_at": "2026-02-18T10:30:00+00:00",
+            "is_completed": False,
+        }
+
+        out = to_toon_response("task.get", raw)
+        self.assertEqual({"d": {"i": "t1", "n": "Task 1", "ca": "2026-02-18T13:30:00+03:00"}}, out)
 
     def test_task_list_by_date_filters_items_without_matching_due_date(self) -> None:
         raw = {

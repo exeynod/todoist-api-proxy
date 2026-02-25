@@ -127,6 +127,7 @@ Choose the minimal required sequence of these methods based on user intent:
 - For `task.update`:
   - Required: `task_id`.
   - Optional body fields follow `task.create` rules (`description`, `date`, `startDate`, `endDate`, `priority`, `p`, `labels`, `l`, `projectId`, `taskGroupId`, `sectionId`, `section_id`).
+  - To clear labels, pass an explicit empty array: `{"task_id":"...","labels":[]}` or `{"task_id":"...","l":[]}`.
 - For `task.close`:
   - Required: `task_id`.
   - Use `POST ${TODOIST_PROXY_BASE_URL}/toon/task.close` by default.
@@ -142,7 +143,8 @@ Choose the minimal required sequence of these methods based on user intent:
 - TOON delete/close methods: `{"d":{"ok":1}}`.
 - TOON entity objects include `i` (entity id) for tasks, projects, sections, checklist items.
 - TOON task objects may include `l` (labels list).
-- TOON task objects may include `p` (priority `1..4`).
+- TOON task objects may include `p` (priority in P-scale: `1` highest, `4` lowest).
+- TOON task objects may include `ca` (task created datetime).
 - Priority shorthand meaning: `P1` = highest, `P4` = lowest.
 - TOON task objects may include section reference key `tg` (task section id).
 - Error payload: `{"error":{"status":<int>,"message":"<text>"}}`.
