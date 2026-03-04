@@ -4,6 +4,7 @@ import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
+from todoist_proxy.schemas import InputValidationError
 from todoist_proxy.service import execute_method
 
 
@@ -163,6 +164,92 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual("POST", call.method)
         self.assertEqual("/tasks/t1", call.path)
         self.assertEqual({"labels": ["Work", "Urgent"]}, call.body)
+
+    def test_task_move_requires_target_project_or_section(self) -> None:
+        client = RecordingClient(responses=[])
+
+        with self.assertRaises(InputValidationError):
+            execute_method(
+                client,
+                "task.move",
+                {
+                    "task_id": "t1",
+                },
+            )
+
+        self.assertEqual([], client.calls)
+
+    def test_task_move_calls_native_move_endpoint(self) -> None:
+        client = RecordingClient(
+            responses=[
+                {
+                    "id": "t1",
+                    "content": "Task Source",
+                    "project_id": "p2",
+                    "section_id": "s2",
+                }
+            ]
+        )
+
+        result = execute_method(
+            client,
+            "task.move",
+            {
+                "task_id": "t1",
+                "projectId": "p2",
+                "sectionId": "s2",
+            },
+        )
+
+        self.assertEqual({"id": "t1", "content": "Task Source", "project_id": "p2", "section_id": "s2"}, result)
+        self.assertEqual(1, len(client.calls))
+        self.assertEqual("POST", client.calls[0].method)
+        self.assertEqual("/tasks/t1/move", client.calls[0].path)
+        self.assertEqual(
+            {
+                "project_id": "p2",
+                "section_id": "s2",
+            },
+            client.calls[0].body,
+        )
+
+    def test_task_move_to_project_without_section_sends_project_only(self) -> None:
+        client = RecordingClient(responses=[{"id": "t1"}])
+
+        execute_method(
+            client,
+            "task.move",
+            {
+                "task_id": "t1",
+                "projectId": "p2",
+            },
+        )
+
+        self.assertEqual(
+            {
+                "project_id": "p2",
+            },
+            client.calls[0].body,
+        )
+
+    def test_task_move_with_section_alias_sends_section_only(self) -> None:
+        client = RecordingClient(responses=[{"id": "t1"}])
+
+        execute_method(
+            client,
+            "task.move",
+            {
+                "task_id": "t1",
+                "taskGroupId": "s2",
+            },
+        )
+
+        self.assertEqual(
+            {
+                "section_id": "s2",
+            },
+            client.calls[0].body,
+        )
 
     def test_task_create_accepts_p1_priority_notation(self) -> None:
         client = RecordingClient(responses=[{"id": "t1"}])

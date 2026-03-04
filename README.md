@@ -59,6 +59,9 @@ Every Todoist request must include token in headers:
 
 Task-specific notes:
 - `task.close` is supported (`POST /raw/task.close`, `POST /toon/task.close`, `POST /task.close`).
+- `task.move` is supported (`POST /raw/task.move`, `POST /toon/task.move`, `POST /task.move`).
+- `task.move` requires `task_id` and at least one move target: `projectId` or section alias (`taskGroupId`/`sectionId`/`section_id`).
+- `task.move` uses Todoist native endpoint (`POST /tasks/{task_id}/move`): task keeps the same id and changes project/section.
 - `task.create`/`task.update` accept section aliases: `taskGroupId`, `sectionId`, `section_id`.
 - `task.create`/`task.update` accept priority in `priority` and compact alias `p` (`p` uses P-scale: `1` highest, `4` lowest).
 - Priority shorthand: `P1` is highest, `P4` is lowest.
@@ -98,6 +101,11 @@ curl -sS -X POST http://127.0.0.1:8080/toon/task.close \
   -H "Authorization: Bearer <token>" \
   -H "content-type: application/json" \
   -d '{"task_id":"12345"}'
+
+curl -sS -X POST http://127.0.0.1:8080/toon/task.move \
+  -H "Authorization: Bearer <token>" \
+  -H "content-type: application/json" \
+  -d '{"task_id":"12345","projectId":"p2","sectionId":"s7"}'
 ```
 
 ## Live Integration Suite

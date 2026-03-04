@@ -178,6 +178,7 @@ The service supports exactly these method names:
 - `task.get`
 - `task.create`
 - `task.update`
+- `task.move`
 - `task.delete`
 - `task.close`
 - `project.list`
@@ -230,6 +231,16 @@ The service supports exactly these method names:
 - `task.update`
   - Upstream: `POST /tasks/{task_id}`
   - Same field mapping as `task.create`.
+- `task.move`
+  - Upstream: `POST /tasks/{task_id}/move`
+  - Required: `task_id`
+  - Move target (at least one):
+    - `projectId`
+    - section alias: `taskGroupId`, `sectionId`, `section_id`
+  - Body adaptation:
+    - `projectId` -> `project_id`
+    - section alias resolution (`taskGroupId`, `sectionId`, `section_id`) -> `section_id`
+  - Uses Todoist native move semantics: moved task keeps the same `id`.
 - `task.delete`
   - Upstream: `DELETE /tasks/{task_id}`.
 - `task.close`

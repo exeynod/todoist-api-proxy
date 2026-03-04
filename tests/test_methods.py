@@ -71,6 +71,13 @@ class MethodsTests(unittest.TestCase):
                 "query": {},
                 "body": {"name": "Task2"},
             },
+            "task.move": {
+                "input": {"task_id": "t1", "projectId": "p2", "sectionId": "s2"},
+                "method": "POST",
+                "path": "/tasks/t1/move",
+                "query": {},
+                "body": {"projectId": "p2", "sectionId": "s2"},
+            },
             "task.delete": {
                 "input": {"task_id": "t1"},
                 "method": "DELETE",
@@ -266,6 +273,13 @@ class MethodsTests(unittest.TestCase):
             {"task_id": "t1", "l": ["Inbox", "Bug"]},
         )
         self.assertEqual({"l": ["Inbox", "Bug"]}, update_request.body)
+
+    def test_task_move_accepts_section_aliases(self) -> None:
+        move_request = build_request(
+            "task.move",
+            {"task_id": "t1", "sectionId": "s2"},
+        )
+        self.assertEqual({"sectionId": "s2"}, move_request.body)
 
 
 if __name__ == "__main__":

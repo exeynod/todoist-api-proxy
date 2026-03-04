@@ -96,6 +96,7 @@ class AppTests(unittest.TestCase):
         self.assertIn("methods", payload)
         names = [item["name"] for item in payload["methods"]]
         self.assertIn("task.list", names)
+        self.assertIn("task.move", names)
 
     def test_invalid_json_input_returns_validation_error(self) -> None:
         app = create_app(client_factory=lambda token=None: DummyClient({}))

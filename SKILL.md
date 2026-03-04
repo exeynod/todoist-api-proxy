@@ -82,6 +82,7 @@ Choose the minimal required sequence of these methods based on user intent:
 | `task.get` | Get task details. | `task_id` |
 | `task.create` | Create task. | `name` |
 | `task.update` | Update task. | `task_id` |
+| `task.move` | Move task to another project/section. | `task_id` + (`projectId` or section alias) |
 | `task.delete` | Delete task. | `task_id` |
 | `task.close` | Close task. | `task_id` |
 | `project.list` | List projects. | none |
@@ -104,6 +105,7 @@ Choose the minimal required sequence of these methods based on user intent:
 - `task.list_by_date` TOON safety: tasks without matching due date are excluded.
 - `GET /tasks/today` TOON safety: tasks without due date are excluded; only due `<= today`.
 - Task creation/update optional fields: `description`, `date`, `startDate`, `endDate`, `priority`, `p`, `labels`, `l`, `projectId`, `taskGroupId`, `sectionId`, `section_id`.
+- Task move target fields: `projectId`, `taskGroupId`, `sectionId`, `section_id`.
 - Priority scale for user-facing shorthand:
   - maximum priority: `P1`;
   - minimum priority: `P4`.
@@ -127,7 +129,13 @@ Choose the minimal required sequence of these methods based on user intent:
 - For `task.update`:
   - Required: `task_id`.
   - Optional body fields follow `task.create` rules (`description`, `date`, `startDate`, `endDate`, `priority`, `p`, `labels`, `l`, `projectId`, `taskGroupId`, `sectionId`, `section_id`).
+  - For project/section relocation, prefer `task.move`.
   - To clear labels, pass an explicit empty array: `{"task_id":"...","labels":[]}` or `{"task_id":"...","l":[]}`.
+- For `task.move`:
+  - Required: `task_id`.
+  - Required move target: at least one of `projectId`, `taskGroupId`, `sectionId`, `section_id`.
+  - Behavior: proxy calls Todoist native `POST /tasks/{task_id}/move`.
+  - Result: moved task keeps the same id; use `response.d.i` (or original `task_id`) for further operations.
 - For `task.close`:
   - Required: `task_id`.
   - Use `POST ${TODOIST_PROXY_BASE_URL}/toon/task.close` by default.

@@ -45,6 +45,9 @@ class LiveIntegrationRunner:
         self.main_project_id: str | None = None
         self.main_section_id: str | None = None
         self.main_task_id: str | None = None
+        self.move_source_project_id: str | None = None
+        self.move_destination_project_id: str | None = None
+        self.move_destination_section_id: str | None = None
         self.today = date.today().isoformat()
         self.run_id = datetime.utcnow().strftime("%Y%m%d%H%M%S")
         self.rate_state_file = f"/tmp/todoist_proxy_rate_limit_{self.run_id}.json"
@@ -577,6 +580,12 @@ class LiveIntegrationRunner:
         )
         self._assert_toon_envelope("DEFAULT task.update", default_task_update)
 
+        # Task move (project + section) across all modes with factual verification.
+        self._test_task_move_mode(mode_name="RAW", move_path="/raw/task.move", expect_toon=False)
+        self._test_task_move_mode(mode_name="TOON", move_path="/toon/task.move", expect_toon=True)
+        self._test_task_move_mode(mode_name="DEFAULT", move_path="/task.move", expect_toon=True)
+        self._cleanup_task_move_targets()
+
         # Project update on main project
         self._assert_request(
             "RAW project.update",
@@ -812,14 +821,25 @@ class LiveIntegrationRunner:
             id_field_hint="id",
             track_collection=self.created_tasks,
         )
-        self._create_update_delete_entity_matrix(
-            entity="project",
-            create_payload={"name": f"IT-PROXY {self.run_id} matrix project"},
-            update_payload_builder=lambda entity_id: {"project_id": entity_id, "name": f"IT-PROXY {self.run_id} matrix project updated"},
-            delete_payload_builder=lambda entity_id: {"project_id": entity_id},
-            id_field_hint="id",
-            track_collection=self.created_projects,
-        )
+        try:
+            self._create_update_delete_entity_matrix(
+                entity="project",
+                create_payload={"name": f"IT-PROXY {self.run_id} matrix project"},
+                update_payload_builder=lambda entity_id: {"project_id": entity_id, "name": f"IT-PROXY {self.run_id} matrix project updated"},
+                delete_payload_builder=lambda entity_id: {"project_id": entity_id},
+                id_field_hint="id",
+                track_collection=self.created_projects,
+            )
+        except RuntimeError as exc:
+            if "status 403" in str(exc):
+                self._record(
+                    "SKIP project matrix (quota)",
+                    True,
+                    403,
+                    "project.create returned 403 (likely account project quota); project matrix skipped",
+                )
+            else:
+                raise
         self._create_update_delete_entity_matrix(
             entity="section",
             create_payload={"name": f"IT-PROXY {self.run_id} matrix section", "projectId": self.main_project_id},
@@ -944,6 +964,15 @@ class LiveIntegrationRunner:
                 toon_smoke_id = self._find_entity_id_by_name(entity=entity, name=toon_smoke_name, create_payload=create_payload)
                 if toon_smoke_id:
                     track_collection.append(toon_smoke_id)
+        if entity == "project" and toon_smoke_id:
+            self._assert_request(
+                "CLEANUP TOON project.create (smoke)",
+                "POST",
+                "/raw/project.delete",
+                payload={"project_id": toon_smoke_id},
+                expected_status=200,
+            )
+            track_collection[:] = [item for item in track_collection if item != toon_smoke_id]
         toon_id = self._extract_id(f"SEED RAW {entity}.create for TOON flow", toon_seed, id_field=id_field_hint)
         track_collection.append(toon_id)
         toon_updated = self._assert_request(
@@ -993,6 +1022,15 @@ class LiveIntegrationRunner:
                 )
                 if default_smoke_id:
                     track_collection.append(default_smoke_id)
+        if entity == "project" and default_smoke_id:
+            self._assert_request(
+                "CLEANUP DEFAULT project.create (smoke)",
+                "POST",
+                "/raw/project.delete",
+                payload={"project_id": default_smoke_id},
+                expected_status=200,
+            )
+            track_collection[:] = [item for item in track_collection if item != default_smoke_id]
         default_id = self._extract_id(
             f"SEED RAW {entity}.create for DEFAULT flow",
             default_seed,
@@ -1016,6 +1054,244 @@ class LiveIntegrationRunner:
         )
         self._assert_equal(f"DEFAULT {entity}.delete", default_deleted, {"d": {"ok": 1}})
         track_collection[:] = [item for item in track_collection if item != default_id]
+
+    def _ensure_task_move_targets(self) -> tuple[str, str, str]:
+        if (
+            self.move_destination_project_id is not None
+            and self.move_destination_section_id is not None
+            and self.main_project_id is not None
+        ):
+            return (
+                self.main_project_id,
+                self.move_destination_project_id,
+                self.move_destination_section_id,
+            )
+
+        if self.main_project_id is None:
+            raise RuntimeError("task.move shared source project is not initialized")
+        src_project_id = self.main_project_id
+
+        dst_project_payload = self._assert_request(
+            "SEED task.move shared destination project",
+            "POST",
+            "/raw/project.create",
+            payload={"name": f"IT-PROXY {self.run_id} move shared dst project"},
+            expected_status=200,
+        )
+        dst_project_id = self._extract_id("SEED task.move shared destination project", dst_project_payload)
+        self.created_projects.append(dst_project_id)
+
+        dst_section_payload = self._assert_request(
+            "SEED task.move shared destination section",
+            "POST",
+            "/raw/section.create",
+            payload={
+                "name": f"IT-PROXY {self.run_id} move shared dst section",
+                "projectId": dst_project_id,
+            },
+            expected_status=200,
+        )
+        dst_section_id = self._extract_id("SEED task.move shared destination section", dst_section_payload)
+        self.created_sections.append(dst_section_id)
+
+        self.move_source_project_id = src_project_id
+        self.move_destination_project_id = dst_project_id
+        self.move_destination_section_id = dst_section_id
+        return src_project_id, dst_project_id, dst_section_id
+
+    def _cleanup_task_move_targets(self) -> None:
+        if self.move_destination_section_id is not None:
+            section_id = self.move_destination_section_id
+            self._best_effort_request(
+                "POST",
+                "/raw/section.delete",
+                payload={"task_group_id": section_id},
+            )
+            self.created_sections = [item for item in self.created_sections if item != section_id]
+            self.move_destination_section_id = None
+
+        if self.move_destination_project_id is not None:
+            project_id = self.move_destination_project_id
+            self._best_effort_request(
+                "POST",
+                "/raw/project.delete",
+                payload={"project_id": project_id},
+            )
+            self.created_projects = [item for item in self.created_projects if item != project_id]
+            self.move_destination_project_id = None
+
+        if (
+            self.move_source_project_id is not None
+            and self.move_source_project_id != self.main_project_id
+        ):
+            project_id = self.move_source_project_id
+            self._best_effort_request(
+                "POST",
+                "/raw/project.delete",
+                payload={"project_id": project_id},
+            )
+            self.created_projects = [item for item in self.created_projects if item != project_id]
+        self.move_source_project_id = None
+
+    def _test_task_move_mode(self, *, mode_name: str, move_path: str, expect_toon: bool) -> None:
+        mode_slug = mode_name.lower()
+        src_project_id, dst_project_id, dst_section_id = self._ensure_task_move_targets()
+
+        source_task_name = f"IT-PROXY {self.run_id} move {mode_slug} source task"
+        source_task_payload = self._assert_request(
+            f"SEED {mode_name} task.move source task",
+            "POST",
+            "/raw/task.create",
+            payload={
+                "name": source_task_name,
+                "projectId": src_project_id,
+            },
+            expected_status=200,
+        )
+        source_task_id = self._extract_id(f"SEED {mode_name} task.move source task", source_task_payload)
+        self.created_tasks.append(source_task_id)
+
+        moved_payload = self._assert_request(
+            f"{mode_name} task.move",
+            "POST",
+            move_path,
+            payload={
+                "task_id": source_task_id,
+                "projectId": dst_project_id,
+                "sectionId": dst_section_id,
+            },
+            expected_status=200,
+        )
+        if expect_toon:
+            self._assert_toon_envelope(f"{mode_name} task.move", moved_payload)
+            moved_task_id = self._extract_toon_entity_id(moved_payload)
+            if moved_task_id is None:
+                self._record(
+                    f"ASSERT {mode_name} task.move id extraction",
+                    False,
+                    None,
+                    f"cannot extract moved task id from payload={moved_payload!r}",
+                )
+                raise RuntimeError(f"{mode_name} task.move returned no task id")
+        else:
+            moved_task_id = self._extract_id(f"{mode_name} task.move", moved_payload)
+
+        if moved_task_id == source_task_id:
+            self._record(
+                f"ASSERT {mode_name} task.move id stays same",
+                True,
+                200,
+                f"move kept original id ({source_task_id})",
+            )
+        else:
+            self._record(
+                f"ASSERT {mode_name} task.move id stays same",
+                False,
+                None,
+                f"expected moved task id={source_task_id!r}, got {moved_task_id!r}",
+            )
+
+        self.created_tasks = [item for item in self.created_tasks if item != source_task_id]
+        self.created_tasks.append(moved_task_id)
+
+        moved_task_get = self._assert_request(
+            f"VERIFY {mode_name} task.move destination task get",
+            "POST",
+            "/raw/task.get",
+            payload={"task_id": moved_task_id},
+            expected_status=200,
+        )
+        moved_project = moved_task_get.get("project_id") if isinstance(moved_task_get, dict) else None
+        moved_section = moved_task_get.get("section_id") if isinstance(moved_task_get, dict) else None
+        if str(moved_project) == str(dst_project_id):
+            self._record(
+                f"ASSERT {mode_name} task.move project ref",
+                True,
+                200,
+                f"project_id matches destination ({dst_project_id})",
+            )
+        else:
+            self._record(
+                f"ASSERT {mode_name} task.move project ref",
+                False,
+                None,
+                f"expected project_id={dst_project_id!r}, got {moved_project!r}",
+            )
+        if str(moved_section) == str(dst_section_id):
+            self._record(
+                f"ASSERT {mode_name} task.move section ref",
+                True,
+                200,
+                f"section_id matches destination ({dst_section_id})",
+            )
+        else:
+            self._record(
+                f"ASSERT {mode_name} task.move section ref",
+                False,
+                None,
+                f"expected section_id={dst_section_id!r}, got {moved_section!r}",
+            )
+
+        src_project_list = self._assert_request(
+            f"VERIFY {mode_name} task.move source project list",
+            "POST",
+            "/raw/task.list_by_project",
+            payload={"project_id": src_project_id},
+            expected_status=200,
+        )
+        if source_task_id not in self._extract_raw_task_ids(src_project_list):
+            self._record(
+                f"ASSERT {mode_name} task.move source project list",
+                True,
+                200,
+                f"source task id {source_task_id} is absent in source project",
+            )
+        else:
+            self._record(
+                f"ASSERT {mode_name} task.move source project list",
+                False,
+                None,
+                f"source task id {source_task_id} still present in source project",
+            )
+
+        dst_project_list = self._assert_request(
+            f"VERIFY {mode_name} task.move destination project list",
+            "POST",
+            "/raw/task.list_by_project",
+            payload={"project_id": dst_project_id},
+            expected_status=200,
+        )
+        if moved_task_id in self._extract_raw_task_ids(dst_project_list):
+            self._record(
+                f"ASSERT {mode_name} task.move destination project list",
+                True,
+                200,
+                f"moved task id {moved_task_id} found in destination project",
+            )
+        else:
+            self._record(
+                f"ASSERT {mode_name} task.move destination project list",
+                False,
+                None,
+                f"moved task id {moved_task_id} absent in destination project",
+            )
+
+    def _extract_raw_task_ids(self, payload: Any) -> set[str]:
+        rows: Any = payload
+        if isinstance(payload, dict):
+            for key in ("results", "tasks", "items", "data", "content", "list"):
+                candidate = payload.get(key)
+                if isinstance(candidate, list):
+                    rows = candidate
+                    break
+
+        ids: set[str] = set()
+        if not isinstance(rows, list):
+            return ids
+        for item in rows:
+            if isinstance(item, dict) and item.get("id") is not None:
+                ids.add(str(item["id"]))
+        return ids
 
     def _payload_with_name_suffix(self, payload: dict[str, Any], suffix: str) -> dict[str, Any]:
         cloned = dict(payload)
@@ -1223,6 +1499,7 @@ class LiveIntegrationRunner:
             "task.get",
             "task.create",
             "task.update",
+            "task.move",
             "task.delete",
             "task.close",
             "project.list",

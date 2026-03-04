@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 from todoist_proxy.methods import get_schema
-from todoist_proxy.schemas import JsonDict, RequestSpec
+from todoist_proxy.schemas import InputValidationError, JsonDict, RequestSpec
 
 _DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -14,6 +14,8 @@ def execute_method(client: Any, method_name: str, payload: dict[str, Any] | None
     schema = get_schema(method_name)
     data = schema.validate_input(payload)
 
+    if method_name == "task.move":
+        _validate_task_move_input(data)
     if method_name == "checklist.create":
         return _execute_checklist_create(client, data)
     if method_name == "checklist.update":
@@ -32,6 +34,15 @@ def _adapt_for_todoist(method_name: str, spec: RequestSpec, data: JsonDict) -> R
 
     if method_name in {"task.create", "task.update"}:
         return replace(spec, body=_task_payload_to_todoist(spec.body))
+
+    if method_name == "task.move":
+        body: JsonDict = {}
+        if "projectId" in spec.body:
+            body["project_id"] = spec.body["projectId"]
+        section_id = _task_section_id(spec.body)
+        if section_id is not None:
+            body["section_id"] = section_id
+        return replace(spec, body=body)
 
     if method_name in {"project.create", "project.update"}:
         body = {"name": spec.body["name"]} if "name" in spec.body else {}
@@ -91,6 +102,21 @@ def _task_payload_to_todoist(payload: JsonDict) -> JsonDict:
         body["deadline_date"] = end_date[:10] if len(end_date) >= 10 else end_date
 
     return body
+
+
+def _validate_task_move_input(payload: JsonDict) -> None:
+    task_id = payload.get("task_id")
+    if task_id is None or not str(task_id).strip():
+        raise InputValidationError("missing required fields for 'task.move': task_id")
+
+    target_project_id = payload.get("projectId")
+    has_project_target = target_project_id is not None and str(target_project_id).strip() != ""
+    target_section_id = _task_section_id(payload)
+    if not has_project_target and target_section_id is None:
+        raise InputValidationError(
+            "missing required move target for 'task.move': provide projectId or section alias "
+            "(taskGroupId/sectionId/section_id)"
+        )
 
 
 def _task_section_id(payload: JsonDict) -> str | None:

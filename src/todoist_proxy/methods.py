@@ -132,6 +132,28 @@ _METHODS: tuple[MethodSchema, ...] = (
         toon_output="task",
     ),
     MethodSchema(
+        name="task.move",
+        http_method="POST",
+        path_template="/tasks/{task_id}/move",
+        description="Move task to another project/section.",
+        required=("task_id",),
+        optional=(
+            "projectId",
+            "taskGroupId",
+            "sectionId",
+            "section_id",
+        ),
+        path_params=("task_id",),
+        query_params=(),
+        body_params=(
+            ("projectId", "projectId"),
+            ("taskGroupId", "taskGroupId"),
+            ("sectionId", "sectionId"),
+            ("section_id", "section_id"),
+        ),
+        toon_output="task",
+    ),
+    MethodSchema(
         name="task.delete",
         http_method="DELETE",
         path_template="/tasks/{task_id}",
